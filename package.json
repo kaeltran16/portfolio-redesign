@@ -1,0 +1,22 @@
+{
+  "name": "portfolio-redesign",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "vitest run",
+    "shots": "node scripts/shots.mjs"
+  },
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/montserrat": "^5.3.0",
+    "astro": "^7.4.2",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "vitest": "^5.0.5"
+  }
+}
