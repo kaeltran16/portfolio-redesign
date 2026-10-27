@@ -25,6 +25,36 @@ const titleFits = `(() => {
   const right = Math.max(...[...document.querySelectorAll('[data-title-sizer] > *')].map(s => s.getBoundingClientRect().right));
   return right > innerWidth ? 'title overflows: ' + Math.round(right) + 'px > ' + innerWidth + 'px' : '';
 })()`;
+const showExperience = "document.getElementById('experience').scrollIntoView()";
+// returns an error string when the section runs past the viewport or its text drops below 4.5:1 (wcag aa).
+// colours go through a 1px canvas so color-mix and translucent text are composited as the browser draws them
+const experienceReadable = `(() => {
+  const section = document.getElementById('experience');
+  const over = [...section.querySelectorAll('*')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5);
+  if (over) return 'experience overflows: .' + over.className + ' ends at ' + Math.round(over.getBoundingClientRect().right) + 'px > ' + innerWidth + 'px';
+  const ctx = Object.assign(document.createElement('canvas'), { width: 1, height: 1 }).getContext('2d', { willReadFrequently: true });
+  const paint = (...colors) => {
+    ctx.clearRect(0, 0, 1, 1);
+    for (const c of colors) {
+      ctx.fillStyle = 'transparent';
+      ctx.fillStyle = c;
+      if (ctx.fillStyle === 'rgba(0, 0, 0, 0)') throw new Error('canvas cannot parse colour ' + c);
+      ctx.fillRect(0, 0, 1, 1);
+    }
+    return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3);
+  };
+  const luminance = rgb => rgb
+    .map(v => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const bg = getComputedStyle(document.body).backgroundColor;
+  const low = [...section.querySelectorAll('h2, h3, .experience-dates, .experience-company, .experience-body li')]
+    .map(el => {
+      const [a, b] = [luminance(paint(bg)), luminance(paint(bg, getComputedStyle(el).color))];
+      return { el, ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) };
+    })
+    .filter(({ ratio }) => ratio < 4.5);
+  return low.map(({ el, ratio }) => (el.className || el.tagName) + ' contrast ' + ratio.toFixed(2) + ':1').join(', ');
+})()`;
 
 const SCENARIOS = [
   { name: 'desktop', viewport: desktop, waitMs: 7000, check: titleFits },
@@ -33,6 +63,33 @@ const SCENARIOS = [
   { name: 'light', viewport: desktop, waitMs: 6000, eval: toggleTheme },
   { name: 'phone-390', viewport: phone, waitMs: 6000, check: titleFits },
   { name: 'reduced-motion', viewport: desktop, waitMs: 1500, reduced: true },
+  // clip captures just the section, past the viewport when it is taller
+  ...[
+    ['experience', desktop, false],
+    ['experience-light', desktop, true],
+    ['experience-phone-390', phone, false],
+    ['experience-phone-390-light', phone, true],
+  ].map(([name, viewport, light]) => ({
+    name,
+    viewport,
+    waitMs: 1500,
+    eval: light ? `${toggleTheme}; ${showExperience}` : showExperience,
+    check: experienceReadable,
+    clip: '#experience',
+    step: `experience section at ${viewport.width}px, ${light ? 'light' : 'dark'}: fits the width, text at 4.5:1 or more`,
+  })),
+  {
+    name: 'experience-focus',
+    viewport: desktop,
+    waitMs: 500,
+    eval: `${showExperience}; document.querySelector('#experience .button').focus()`,
+    check: `(() => {
+      const button = document.querySelector('#experience .button');
+      return button.matches(':focus-visible') && getComputedStyle(button).outlineStyle !== 'none' ? '' : 'download cv button shows no focus ring';
+    })()`,
+    clip: '#experience',
+    step: 'experience download cv button focused: focus ring visible',
+  },
 ];
 
 const only = process.env.SHOTS?.split(',');
@@ -107,13 +164,24 @@ try {
     if (s.eval) await send('Runtime.evaluate', { expression: s.eval }, sessionId);
     await sleep(s.waitMs);
     if (s.check) {
-      const { result } = await send('Runtime.evaluate', { expression: s.check, returnByValue: true }, sessionId);
-      if (result.value) errors.push(`${s.name}: ${result.value}`);
+      const { result, exceptionDetails } = await send('Runtime.evaluate', { expression: s.check, returnByValue: true }, sessionId);
+      const failure = exceptionDetails ? `check threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}` : result.value;
+      if (failure) errors.push(`${s.name}: ${failure}`);
     }
-    const { data } = await send('Page.captureScreenshot', { format: 'png' }, sessionId);
+    const capture = { format: 'png' };
+    if (s.clip) {
+      const { result } = await send('Runtime.evaluate', {
+        expression: `(() => { const r = document.querySelector(${JSON.stringify(s.clip)}).getBoundingClientRect(); return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, scale: 1 }; })()`,
+        returnByValue: true,
+      }, sessionId);
+      Object.assign(capture, { clip: result.value, captureBeyondViewport: true });
+    }
+    const { data } = await send('Page.captureScreenshot', capture, sessionId);
     const file = `${s.name}.png`;
     writeFileSync(join(OUT, file), Buffer.from(data, 'base64'));
-    shots.push({ name: s.name, files: [file], steps: [{ step: `open at ${s.viewport.width}px${s.reduced ? ', reduced motion' : ''}${s.eval ? ', theme toggled' : ''}`, state: 'pass' }] });
+    const step = s.step ?? `open at ${s.viewport.width}px${s.reduced ? ', reduced motion' : ''}${s.eval ? ', theme toggled' : ''}`;
+    const failed = errors.filter(e => e.startsWith(`${s.name}: `));
+    shots.push({ name: s.name, files: [file], steps: [{ step, state: failed.length ? 'fail' : 'pass', detail: failed.join('; ') || undefined }] });
     listeners.splice(listeners.indexOf(onEvent), 1);
     await send('Target.closeTarget', { targetId });
     await send('Target.disposeBrowserContext', { browserContextId });
