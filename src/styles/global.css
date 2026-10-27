@@ -796,7 +796,9 @@ body {
 
 /* --- experience ------------------------------------------------------------------------------- */
 
-.experience {
+.experience,
+.about,
+.contact {
   display: flex;
   flex-direction: column;
   gap: var(--space3XL);
@@ -809,21 +811,21 @@ body {
   }
 }
 
+.section-title {
+  margin: 0;
+  font-size: calc((48 / 16) * 1rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--textTitle);
+}
+
 .experience-head {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-end;
   gap: var(--spaceXL);
-
-  h2 {
-    margin: 0;
-    font-size: calc((48 / 16) * 1rem);
-    font-weight: 500;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    color: var(--textTitle);
-  }
 }
 
 .experience-list {
@@ -921,6 +923,70 @@ body {
 
 .experience-company {
   margin: 0;
+  color: var(--textLight);
+}
+
+/* --- about and contact ------------------------------------------------------------------------ */
+
+.about-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spaceL);
+  font-size: calc((18 / 16) * 1rem);
+  line-height: 1.6;
+
+  p {
+    /* a readable measure inside the 1200px column */
+    max-width: 68ch;
+    margin: 0;
+  }
+}
+
+.contact {
+  gap: var(--spaceXL);
+  padding-bottom: var(--space2XL);
+}
+
+.contact-pitch {
+  margin: 0;
+  font-size: var(--fontSizeBodyL);
+  line-height: 1.6;
+}
+
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spaceXL);
+}
+
+.contact-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spaceL);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spaceS);
+    color: var(--textBody);
+    fill: currentColor;
+    font-weight: 500;
+    text-decoration: none;
+
+    &:hover {
+      color: var(--accent);
+    }
+  }
+}
+
+.contact-meta {
+  margin: var(--space2XL) 0 0;
+  font-family: var(--monoFontStack);
+  font-size: calc((14 / 16) * 1rem);
   color: var(--textLight);
 }
 

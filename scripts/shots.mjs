@@ -25,13 +25,14 @@ const titleFits = `(() => {
   const right = Math.max(...[...document.querySelectorAll('[data-title-sizer] > *')].map(s => s.getBoundingClientRect().right));
   return right > innerWidth ? 'title overflows: ' + Math.round(right) + 'px > ' + innerWidth + 'px' : '';
 })()`;
-const showExperience = "document.getElementById('experience').scrollIntoView()";
+const show = id => `document.getElementById('${id}').scrollIntoView()`;
+const showExperience = show('experience');
 // returns an error string when the section runs past the viewport or its text drops below 4.5:1 (wcag aa).
 // colours go through a 1px canvas so color-mix and translucent text are composited as the browser draws them
-const experienceReadable = `(() => {
-  const section = document.getElementById('experience');
+const readable = (id, text) => `(() => {
+  const section = document.getElementById('${id}');
   const over = [...section.querySelectorAll('*')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5);
-  if (over) return 'experience overflows: .' + over.className + ' ends at ' + Math.round(over.getBoundingClientRect().right) + 'px > ' + innerWidth + 'px';
+  if (over) return '${id} overflows: .' + over.className + ' ends at ' + Math.round(over.getBoundingClientRect().right) + 'px > ' + innerWidth + 'px';
   const ctx = Object.assign(document.createElement('canvas'), { width: 1, height: 1 }).getContext('2d', { willReadFrequently: true });
   const paint = (...colors) => {
     ctx.clearRect(0, 0, 1, 1);
@@ -47,7 +48,9 @@ const experienceReadable = `(() => {
     .map(v => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
     .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
   const bg = getComputedStyle(document.body).backgroundColor;
-  const low = [...section.querySelectorAll('h2, h3, .experience-dates, .experience-company, .experience-body li')]
+  const unmatched = '${text}'.split(',').find(selector => !section.querySelector(selector));
+  if (unmatched) return '${id}: ' + unmatched + ' matches nothing, so its contrast is unchecked';
+  const low = [...section.querySelectorAll('${text}')]
     .map(el => {
       const [a, b] = [luminance(paint(bg)), luminance(paint(bg, getComputedStyle(el).color))];
       return { el, ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) };
@@ -81,19 +84,23 @@ const SCENARIOS = [
   { name: 'projects-phone-390', viewport: phone, waitMs: 1500, clip: '#projects', check: projectsFit },
   { name: 'projects-phone-light', viewport: phone, waitMs: 1500, eval: toggleTheme, clip: '#projects', check: projectsFit },
   ...[
-    ['experience', desktop, false],
-    ['experience-light', desktop, true],
-    ['experience-phone-390', phone, false],
-    ['experience-phone-390-light', phone, true],
+    ['experience', 'h2, h3, .experience-dates, .experience-company, .experience-body li'],
+    ['about', 'h2, .about-text p'],
+    ['contact', 'h2, .contact-pitch, .contact-links a, .contact-meta'],
+  ].flatMap(([id, text]) => [
+    [id, desktop, false],
+    [`${id}-light`, desktop, true],
+    [`${id}-phone-390`, phone, false],
+    [`${id}-phone-390-light`, phone, true],
   ].map(([name, viewport, light]) => ({
     name,
     viewport,
     waitMs: 1500,
-    eval: light ? `${toggleTheme}; ${showExperience}` : showExperience,
-    check: experienceReadable,
-    clip: '#experience',
-    step: `experience section at ${viewport.width}px, ${light ? 'light' : 'dark'}: fits the width, text at 4.5:1 or more`,
-  })),
+    eval: light ? `${toggleTheme}; ${show(id)}` : show(id),
+    check: readable(id, text),
+    clip: `#${id}`,
+    step: `${id} section at ${viewport.width}px, ${light ? 'light' : 'dark'}: fits the width, text at 4.5:1 or more`,
+  }))),
   {
     name: 'experience-focus',
     viewport: desktop,
