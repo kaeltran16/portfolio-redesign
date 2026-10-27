@@ -10,6 +10,28 @@ const roles = ['Developer', 'Backend engineer', 'Frontend engineer', 'Tool build
 const rolesLabel = `${roles.slice(0, -1).join(', ')}, and ${roles.at(-1)}`;
 const nav = ['Projects', 'Experience', 'About', 'Contact'];
 
+// placeholders from the experience canvas until the real cv lands; the first entry is the current role
+const experience = [
+  {
+    title: '[Current role]',
+    company: '[Company A]',
+    dates: '[2023] – now',
+    highlights: ['[What you built or owned, and what it changed]', '[A second highlight, ideally with a number you can stand behind]', '[A third highlight]'],
+  },
+  {
+    title: '[Previous role]',
+    company: '[Company B]',
+    dates: '[2021] – [2023]',
+    highlights: ['[What you built or owned, and what it changed]', '[A second highlight]'],
+  },
+  {
+    title: '[Earlier role]',
+    company: '[Company C]',
+    dates: '[2019] – [2021]',
+    highlights: ['[What you built or owned, and what it changed]'],
+  },
+];
+
 const social = [
   {
     label: 'GitHub',
@@ -230,6 +252,33 @@ const projects: Project[] = [
             </article>
           ))
         }
+      </section>
+
+      <section class="experience" id="experience" aria-labelledby="experience-title">
+        <div class="experience-head">
+          <h2 id="experience-title">Experience</h2>
+          <a class="button" href="/cv.pdf" download="Khang-Tran-CV.pdf">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24"><path d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17zM5 19h14v2H5z" /></svg>
+            <span>Download CV</span>
+          </a>
+        </div>
+        <ol class="experience-list">
+          {
+            experience.map(({ title, company, dates, highlights }, i) => (
+              <li class="experience-role" data-current={i === 0 ? 'true' : undefined}>
+                <p class="experience-dates">{dates}</p>
+                <div class="experience-marker" aria-hidden="true"></div>
+                <div class="experience-body">
+                  <h3>{title}</h3>
+                  <p class="experience-company">{company}</p>
+                  <ul>
+                    {highlights.map(h => <li>{h}</li>)}
+                  </ul>
+                </div>
+              </li>
+            ))
+          }
+        </ol>
       </section>
     </main>
 
