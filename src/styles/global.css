@@ -24,6 +24,10 @@
   /* used where hamish uses his cyan: wipe bar, hovers, mark cursor, the dark theme's button */
   --accent: #4d9fff;
   --introMaxWidth: 920px;
+  --projectsMaxWidth: 1200px;
+  --fontSizeH3: calc((48 / 16) * 1rem);
+  /* page content clears the rail */
+  --contentInline: calc(var(--spaceOuter) + var(--railWidth) + var(--spaceL));
 }
 
 [data-theme='dark'] {
@@ -62,7 +66,10 @@
   :root {
     --spaceOuter: 24px;
     --fontSizeH0: calc((56 / 16) * 1rem);
+    --fontSizeH3: calc((32 / 16) * 1rem);
     --fontSizeBodyL: calc((17 / 16) * 1rem);
+    /* the rail collapses to the monogram up top, so content can use the full width */
+    --contentInline: var(--spaceOuter);
   }
 }
 
@@ -314,13 +321,8 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-inline: calc(var(--spaceOuter) + var(--railWidth) + var(--spaceL));
+  padding-inline: var(--contentInline);
   overflow: hidden;
-
-  /* the rail collapses to the monogram up top, so the text can use the full width */
-  @media (max-width: 696px) {
-    padding-inline: var(--spaceOuter);
-  }
 }
 
 .sphere {
@@ -637,16 +639,158 @@ body {
   }
 }
 
-/* --- below the fold placeholder --------------------------------------------------------------- */
+/* --- projects --------------------------------------------------------------------------------- */
 
-.next {
-  min-height: 60vh;
+.projects {
+  padding: var(--space3XL) var(--contentInline);
+}
+
+.project {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  grid-template-areas: 'text visual';
+  gap: var(--space3XL);
+  align-items: center;
+  /* row height from the design canvas */
+  min-height: 760px;
+  max-width: var(--projectsMaxWidth);
+  margin: 0 auto;
+
+  &:nth-of-type(even) {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    grid-template-areas: 'visual text';
+  }
+}
+
+/* below this the text column gets too narrow for a 48px title, so rows stack */
+@media (max-width: 1040px) {
+  .project,
+  .project:nth-of-type(even) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'visual' 'text';
+    gap: var(--spaceXL);
+    min-height: 0;
+    padding-block: var(--space2XL);
+  }
+}
+
+.project-text {
+  grid-area: text;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spaceL);
+}
+
+.project-index {
+  display: flex;
+  align-items: center;
+  gap: var(--spaceM);
+  font-size: var(--fontSizeBodyS);
+  font-weight: 500;
+  color: var(--textLight);
+
+  &::before {
+    content: '';
+    width: var(--space2XL);
+    height: 2px;
+    background: color-mix(in lab, var(--text) 30%, transparent);
+  }
+}
+
+.project-title {
+  margin: 0;
+  font-size: var(--fontSizeH3);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--textTitle);
+}
+
+.project-description {
+  margin: 0;
+  font-size: var(--fontSizeBodyL);
+  line-height: 1.6;
+}
+
+/* every visual sits in the same box so rows line up; it is the diagrams' viewBox */
+.project-visual {
+  grid-area: visual;
+  justify-self: center;
+  width: 100%;
+  max-width: 680px;
+  aspect-ratio: 680 / 520;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spaceOuter);
+  container-type: inline-size;
+}
+
+/* the dash period, so one loop moves each packet exactly one gap along */
+@keyframes diagram-flow {
+  to { stroke-dashoffset: -66; }
+}
+
+.diagram {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: var(--monoFontStack);
+}
+
+.diagram-edges {
+  fill: none;
+  stroke: color-mix(in lab, var(--text) 25%, transparent);
+  stroke-width: 1.5;
+}
+
+.diagram-packets {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 60;
+  animation: diagram-flow 2.4s linear infinite;
+}
+
+.diagram-boxes {
+  fill: color-mix(in lab, var(--text) 4%, transparent);
+  stroke: color-mix(in lab, var(--text) 35%, transparent);
+  stroke-width: 1;
+}
+
+.diagram-labels {
+  fill: color-mix(in lab, var(--text) 85%, transparent);
+  font-size: 16px;
+  text-anchor: middle;
+  dominant-baseline: central;
+
+  [data-tone='primary'] {
+    fill: var(--primary);
+  }
+
+  [data-tone='caption'] {
+    fill: var(--textLight);
+    font-size: 13px;
+    text-anchor: start;
+    dominant-baseline: auto;
+  }
+}
+
+/* a flat phone at the canvas size (250x510, 10px bezel, 40px corners) in the 680-wide box */
+.phone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(100cqw * 250 / 680);
+  height: calc(100cqw * 510 / 680);
+  padding: var(--spaceM);
+  border: calc(100cqw * 10 / 680) solid color-mix(in lab, var(--text) 10%, var(--background));
+  border-radius: calc(100cqw * 40 / 680);
+  background: color-mix(in lab, var(--text) 3%, var(--background));
+  box-shadow: 0 40px 80px color-mix(in lab, var(--black) 40%, transparent);
   font-family: var(--monoFontStack);
   font-size: calc((13 / 16) * 1rem);
+  text-align: center;
   color: var(--textLight);
 }
 

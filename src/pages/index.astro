@@ -27,6 +27,91 @@ const social = [
     path: 'M3 4.5h18A1.5 1.5 0 0 1 22.5 6v12a1.5 1.5 0 0 1-1.5 1.5H3A1.5 1.5 0 0 1 1.5 18V6A1.5 1.5 0 0 1 3 4.5Zm.5 3V17.5h17V7.5l-8.5 6-8.5-6Zm1.6-1 6.9 4.9 6.9-4.9H5.1Z',
   },
 ];
+
+// diagrams are drawn in a 680x520 viewBox, the same box every visual sits in.
+// bracketed text is a placeholder until khang supplies the real copy and media.
+type Label = { x: number; y: number; text: string; tone?: 'primary' | 'caption' };
+type Visual =
+  | { kind: 'diagram'; label: string; edges: string[]; boxes: [number, number, number, number][]; labels: Label[] }
+  | { kind: 'phone'; placeholder: string };
+type Project = { slug: string; title: string; description: string; visual: Visual };
+
+const projects: Project[] = [
+  {
+    slug: 'arc',
+    title: 'Arc',
+    description: 'A cockpit for Claude Code. Start and watch agent runs, track multi-week initiatives, and review designs beside the terminal.',
+    visual: {
+      kind: 'diagram',
+      label: 'Arc: agent tabs and runs call wsh, which records runs, initiatives and notes in Arc, shown in the cockpit',
+      edges: [
+        'M130 84 C130 112 340 112 340 140',
+        'M340 84 L340 140',
+        'M550 84 C550 112 340 112 340 140',
+        'M340 184 L340 240',
+        'M340 370 L340 436',
+      ],
+      boxes: [
+        [40, 40, 180, 44],
+        [250, 40, 180, 44],
+        [460, 40, 180, 44],
+        [280, 140, 120, 44],
+        [120, 240, 440, 130],
+        [138, 300, 124, 44],
+        [278, 300, 124, 44],
+        [418, 300, 124, 44],
+        [280, 436, 120, 44],
+      ],
+      labels: [
+        { x: 40, y: 24, text: 'agents', tone: 'caption' },
+        { x: 130, y: 62, text: 'claude code' },
+        { x: 340, y: 62, text: 'claude code' },
+        { x: 550, y: 62, text: 'run' },
+        { x: 340, y: 162, text: 'wsh' },
+        { x: 340, y: 270, text: 'arc', tone: 'primary' },
+        { x: 200, y: 322, text: 'runs' },
+        { x: 340, y: 322, text: 'initiatives' },
+        { x: 480, y: 322, text: 'notes' },
+        { x: 340, y: 458, text: 'cockpit' },
+      ],
+    },
+  },
+  {
+    slug: 'anomaly-detection',
+    title: 'anomaly detection',
+    description: '[anomaly detection: one line on what it does and who it is for]',
+    visual: {
+      kind: 'diagram',
+      label: 'anomaly detection, a draft: [log sources] flow through [kafka] into [anomaly detector], which raises [alerts]',
+      edges: ['M340 84 L340 172', 'M340 216 L340 304', 'M340 348 L340 436'],
+      boxes: [
+        [220, 40, 240, 44],
+        [220, 172, 240, 44],
+        [220, 304, 240, 44],
+        [220, 436, 240, 44],
+      ],
+      labels: [
+        { x: 340, y: 62, text: '[log sources]' },
+        { x: 340, y: 194, text: '[kafka]' },
+        { x: 340, y: 326, text: '[anomaly detector]', tone: 'primary' },
+        { x: 340, y: 458, text: '[alerts]' },
+      ],
+    },
+  },
+  {
+    slug: 'expensepal',
+    title: 'expensepal',
+    description: '[expensepal: one line on what it does and who it is for]',
+    visual: { kind: 'phone', placeholder: '[expensepal screenshot]' },
+  },
+  {
+    // device type unknown; a phone until khang says otherwise
+    slug: 'loom',
+    title: 'loom',
+    description: '[loom: one line on what it does and who it is for]',
+    visual: { kind: 'phone', placeholder: '[loom screenshot]' },
+  },
+];
 ---
 
 <!doctype html>
@@ -117,8 +202,34 @@ const social = [
         </a>
       </section>
 
-      <section class="next" id="projects">
-        <p>Projects come next. This build is the first screen only.</p>
+      <section class="projects" id="projects" aria-labelledby="projects-title">
+        <h2 class="visually-hidden" id="projects-title">Projects</h2>
+        {
+          projects.map(({ slug, title, description, visual }, i) => (
+            <article class="project" aria-labelledby={`project-${slug}`}>
+              <div class="project-text">
+                <span class="project-index">{String(i + 1).padStart(2, '0')}</span>
+                <h3 class="project-title" id={`project-${slug}`}>{title}</h3>
+                <p class="project-description">{description}</p>
+                <a class="button" href={`/projects/${slug}`}>
+                  View project<span class="visually-hidden">: {title}</span>
+                </a>
+              </div>
+              <div class="project-visual">
+                {visual.kind === 'diagram' ? (
+                  <svg class="diagram" role="img" aria-label={visual.label} viewBox="0 0 680 520">
+                    <g class="diagram-edges">{visual.edges.map(d => <path d={d} />)}</g>
+                    <g class="diagram-packets">{visual.edges.map(d => <path d={d} />)}</g>
+                    <g class="diagram-boxes">{visual.boxes.map(([x, y, width, height]) => <rect x={x} y={y} width={width} height={height} />)}</g>
+                    <g class="diagram-labels">{visual.labels.map(({ x, y, text, tone }) => <text x={x} y={y} data-tone={tone}>{text}</text>)}</g>
+                  </svg>
+                ) : (
+                  <div class="phone" role="img" aria-label={`${visual.placeholder} on a phone`}>{visual.placeholder}</div>
+                )}
+              </div>
+            </article>
+          ))
+        }
       </section>
     </main>
 
