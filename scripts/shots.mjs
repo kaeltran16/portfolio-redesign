@@ -56,14 +56,30 @@ const experienceReadable = `(() => {
   return low.map(({ el, ratio }) => (el.className || el.tagName) + ' contrast ' + ratio.toFixed(2) + ':1').join(', ');
 })()`;
 
+// returns an error string when the project visuals differ in size or anything spills out
+const projectsFit = `(() => {
+  const boxes = [...document.querySelectorAll('.project-visual')].map(b => b.getBoundingClientRect());
+  const size = b => Math.round(b.width) + 'x' + Math.round(b.height);
+  if (boxes.length !== 4) return 'expected 4 project visuals, found ' + boxes.length;
+  if (new Set(boxes.map(size)).size > 1) return 'project visuals differ: ' + boxes.map(size).join(', ');
+  const wide = [...document.querySelectorAll('#projects *')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5);
+  if (wide) return 'runs past the viewport: ' + wide.tagName + '.' + wide.getAttribute('class');
+  const spill = [...document.querySelectorAll('.phone')].find(p => p.scrollWidth > p.clientWidth || p.scrollHeight > p.clientHeight);
+  return spill ? 'placeholder spills out of its phone: ' + spill.textContent : '';
+})()`;
+const packetsStill = `getComputedStyle(document.querySelector('.diagram-packets')).animationName === 'none' ? '' : 'packets animate under reduced motion'`;
+
 const SCENARIOS = [
   { name: 'desktop', viewport: desktop, waitMs: 7000, check: titleFits },
   // role words change every 5s; 6.2s lands inside the wipe of the second word
   { name: 'role-wipe', viewport: desktop, waitMs: 6200 },
   { name: 'light', viewport: desktop, waitMs: 6000, eval: toggleTheme },
   { name: 'phone-390', viewport: phone, waitMs: 6000, check: titleFits },
-  { name: 'reduced-motion', viewport: desktop, waitMs: 1500, reduced: true },
-  // clip captures just the section, past the viewport when it is taller
+  { name: 'reduced-motion', viewport: desktop, waitMs: 1500, reduced: true, check: packetsStill },
+  { name: 'projects', viewport: desktop, waitMs: 1500, clip: '#projects', check: projectsFit },
+  { name: 'projects-light', viewport: desktop, waitMs: 1500, eval: toggleTheme, clip: '#projects', check: projectsFit },
+  { name: 'projects-phone-390', viewport: phone, waitMs: 1500, clip: '#projects', check: projectsFit },
+  { name: 'projects-phone-light', viewport: phone, waitMs: 1500, eval: toggleTheme, clip: '#projects', check: projectsFit },
   ...[
     ['experience', desktop, false],
     ['experience-light', desktop, true],
@@ -91,6 +107,11 @@ const SCENARIOS = [
     step: 'experience download cv button focused: focus ring visible',
   },
 ];
+// the page-space rect of a selector, for a screenshot of a section taller than the viewport
+const clipOf = selector => `(() => {
+  const r = document.querySelector('${selector}').getBoundingClientRect();
+  return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, scale: 1 };
+})()`;
 
 const only = process.env.SHOTS?.split(',');
 const selected = only ? SCENARIOS.filter(s => only.includes(s.name)) : SCENARIOS;
@@ -165,21 +186,15 @@ try {
     await sleep(s.waitMs);
     if (s.check) {
       const { result, exceptionDetails } = await send('Runtime.evaluate', { expression: s.check, returnByValue: true }, sessionId);
-      const failure = exceptionDetails ? `check threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}` : result.value;
-      if (failure) errors.push(`${s.name}: ${failure}`);
+      // a check that throws must fail, not read as a pass
+      if (exceptionDetails) errors.push(`${s.name}: check threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
+      else if (result.value) errors.push(`${s.name}: ${result.value}`);
     }
-    const capture = { format: 'png' };
-    if (s.clip) {
-      const { result } = await send('Runtime.evaluate', {
-        expression: `(() => { const r = document.querySelector(${JSON.stringify(s.clip)}).getBoundingClientRect(); return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, scale: 1 }; })()`,
-        returnByValue: true,
-      }, sessionId);
-      Object.assign(capture, { clip: result.value, captureBeyondViewport: true });
-    }
-    const { data } = await send('Page.captureScreenshot', capture, sessionId);
+    const clip = s.clip && (await send('Runtime.evaluate', { expression: clipOf(s.clip), returnByValue: true }, sessionId)).result.value;
+    const { data } = await send('Page.captureScreenshot', clip ? { format: 'png', clip, captureBeyondViewport: true } : { format: 'png' }, sessionId);
     const file = `${s.name}.png`;
     writeFileSync(join(OUT, file), Buffer.from(data, 'base64'));
-    const step = s.step ?? `open at ${s.viewport.width}px${s.reduced ? ', reduced motion' : ''}${s.eval ? ', theme toggled' : ''}`;
+    const step = s.step ?? `open at ${s.viewport.width}px${s.reduced ? ', reduced motion' : ''}${s.eval ? ', theme toggled' : ''}${s.clip ? `, ${s.clip} captured` : ''}`;
     const failed = errors.filter(e => e.startsWith(`${s.name}: `));
     shots.push({ name: s.name, files: [file], steps: [{ step, state: failed.length ? 'fail' : 'pass', detail: failed.join('; ') || undefined }] });
     listeners.splice(listeners.indexOf(onEvent), 1);
