@@ -1,0 +1,57 @@
+---
+import Base from '../../layouts/Base.astro';
+import ProjectVisual from '../../components/ProjectVisual.astro';
+import { name, projects } from '../../data';
+
+export function getStaticPaths() {
+  return projects.map((project, i) => ({ params: { slug: project.slug }, props: { index: i } }));
+}
+
+const { index } = Astro.props as { index: number };
+const { title, description, visual, facts, sections } = projects[index];
+const next = projects[(index + 1) % projects.length];
+---
+
+<Base title={`${title} | ${name}`} description={description}>
+  <main class="case">
+    <nav aria-label="Breadcrumb">
+      <a class="case-back" href="/#projects">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z" /></svg>
+        <span>All projects</span>
+      </a>
+    </nav>
+
+    <header class="case-head">
+      <div class="case-intro">
+        <span class="project-index">{String(index + 1).padStart(2, '0')}</span>
+        <h1 class="project-title">{title}</h1>
+        <p class="project-description">{description}</p>
+        <dl class="case-facts">
+          {
+            facts.map(({ label, value }) => (
+              <>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </>
+            ))
+          }
+        </dl>
+      </div>
+      <ProjectVisual visual={visual} />
+    </header>
+
+    {
+      sections.map(({ heading, body }) => (
+        <section class="case-section">
+          <h2>{heading}</h2>
+          <div class="prose">{body.map(p => <p>{p}</p>)}</div>
+        </section>
+      ))
+    }
+
+    <a class="case-next" href={`/projects/${next.slug}`}>
+      <span class="case-next-label">Next project</span>
+      <span class="case-next-title">{next.title}</span>
+    </a>
+  </main>
+</Base>

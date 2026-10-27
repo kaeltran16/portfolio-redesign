@@ -1,14 +1,10 @@
 ---
-import '@fontsource/montserrat/400.css';
-import '@fontsource/montserrat/500.css';
-import '@fontsource/jetbrains-mono/400.css';
-import '../styles/global.css';
+import Base from '../layouts/Base.astro';
+import ProjectVisual from '../components/ProjectVisual.astro';
+import { name, projects, role, social } from '../data';
 
-const name = 'Khang Tran';
-const role = 'Full-stack';
 const roles = ['Developer', 'Backend engineer', 'Frontend engineer', 'Tool builder'];
 const rolesLabel = `${roles.slice(0, -1).join(', ')}, and ${roles.at(-1)}`;
-const nav = ['Projects', 'Experience', 'About', 'Contact'];
 
 // placeholders from the experience canvas until the real cv lands; the first entry is the current role
 const experience = [
@@ -32,23 +28,6 @@ const experience = [
   },
 ];
 
-const social = [
-  {
-    label: 'GitHub',
-    href: 'https://github.com/kaeltran16',
-    path: 'M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z',
-  },
-  {
-    label: 'LinkedIn',
-    href: 'https://www.linkedin.com/in/khangtranx',
-    path: 'M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28ZM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13ZM7.12 20.45H3.56V9h3.56v11.45Z',
-  },
-  {
-    label: 'Email',
-    href: 'mailto:cktran16x2@gmail.com',
-    path: 'M3 4.5h18A1.5 1.5 0 0 1 22.5 6v12a1.5 1.5 0 0 1-1.5 1.5H3A1.5 1.5 0 0 1 1.5 18V6A1.5 1.5 0 0 1 3 4.5Zm.5 3V17.5h17V7.5l-8.5 6-8.5-6Zm1.6-1 6.9 4.9 6.9-4.9H5.1Z',
-  },
-];
 const email = social.find(s => s.href.startsWith('mailto:'))!;
 const elsewhere = social.filter(s => s !== email);
 
@@ -59,272 +38,126 @@ const about = [
   '[Something outside work, optional]',
 ];
 const contactPitch = '[One line on what you are open to, e.g. roles, collaborations, a chat about tooling]';
-
-// diagrams are drawn in a 680x520 viewBox, the same box every visual sits in.
-// bracketed text is a placeholder until khang supplies the real copy and media.
-type Label = { x: number; y: number; text: string; tone?: 'primary' | 'caption' };
-type Visual =
-  | { kind: 'diagram'; label: string; edges: string[]; boxes: [number, number, number, number][]; labels: Label[] }
-  | { kind: 'phone'; placeholder: string };
-type Project = { slug: string; title: string; description: string; visual: Visual };
-
-const projects: Project[] = [
-  {
-    slug: 'arc',
-    title: 'Arc',
-    description: 'A cockpit for Claude Code. Start and watch agent runs, track multi-week initiatives, and review designs beside the terminal.',
-    visual: {
-      kind: 'diagram',
-      label: 'Arc: agent tabs and runs call wsh, which records runs, initiatives and notes in Arc, shown in the cockpit',
-      edges: [
-        'M130 84 C130 112 340 112 340 140',
-        'M340 84 L340 140',
-        'M550 84 C550 112 340 112 340 140',
-        'M340 184 L340 240',
-        'M340 370 L340 436',
-      ],
-      boxes: [
-        [40, 40, 180, 44],
-        [250, 40, 180, 44],
-        [460, 40, 180, 44],
-        [280, 140, 120, 44],
-        [120, 240, 440, 130],
-        [138, 300, 124, 44],
-        [278, 300, 124, 44],
-        [418, 300, 124, 44],
-        [280, 436, 120, 44],
-      ],
-      labels: [
-        { x: 40, y: 24, text: 'agents', tone: 'caption' },
-        { x: 130, y: 62, text: 'claude code' },
-        { x: 340, y: 62, text: 'claude code' },
-        { x: 550, y: 62, text: 'run' },
-        { x: 340, y: 162, text: 'wsh' },
-        { x: 340, y: 270, text: 'arc', tone: 'primary' },
-        { x: 200, y: 322, text: 'runs' },
-        { x: 340, y: 322, text: 'initiatives' },
-        { x: 480, y: 322, text: 'notes' },
-        { x: 340, y: 458, text: 'cockpit' },
-      ],
-    },
-  },
-  {
-    slug: 'anomaly-detection',
-    title: 'anomaly detection',
-    description: '[anomaly detection: one line on what it does and who it is for]',
-    visual: {
-      kind: 'diagram',
-      label: 'anomaly detection, a draft: [log sources] flow through [kafka] into [anomaly detector], which raises [alerts]',
-      edges: ['M340 84 L340 172', 'M340 216 L340 304', 'M340 348 L340 436'],
-      boxes: [
-        [220, 40, 240, 44],
-        [220, 172, 240, 44],
-        [220, 304, 240, 44],
-        [220, 436, 240, 44],
-      ],
-      labels: [
-        { x: 340, y: 62, text: '[log sources]' },
-        { x: 340, y: 194, text: '[kafka]' },
-        { x: 340, y: 326, text: '[anomaly detector]', tone: 'primary' },
-        { x: 340, y: 458, text: '[alerts]' },
-      ],
-    },
-  },
-  {
-    slug: 'expensepal',
-    title: 'expensepal',
-    description: '[expensepal: one line on what it does and who it is for]',
-    visual: { kind: 'phone', placeholder: '[expensepal screenshot]' },
-  },
-  {
-    // device type unknown; a phone until khang says otherwise
-    slug: 'loom',
-    title: 'loom',
-    description: '[loom: one line on what it does and who it is for]',
-    visual: { kind: 'phone', placeholder: '[loom screenshot]' },
-  },
-];
 ---
 
-<!doctype html>
-<html lang="en" data-theme="dark">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{name} | Full-stack software developer</title>
-    <meta name="description" content={`${name}, full-stack software developer. I build the tools engineers use.`} />
-    <script is:inline>
-      // set before first paint so there is no theme flash, and so no-js visitors get the final state
-      document.documentElement.classList.add('js');
-      const theme = localStorage.getItem('theme');
-      if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
-    </script>
-  </head>
-  <body>
-    <header class="rail">
-      <a class="monogram" href="#intro" aria-label={`${name}, ${role} developer`}>
-        <svg aria-hidden="true" class="mark" width="48" height="29" viewBox="0 0 48 29">
-          <text x="0" y="22">kt<tspan class="mark-cursor">_</tspan></text>
-        </svg>
-      </a>
-      <nav class="rail-nav" aria-label="Main">
-        <div class="rail-links">
-          {nav.map(label => <a class="rail-link" href={`#${label.toLowerCase()}`}>{label}</a>)}
-        </div>
-        <div class="rail-icons">
-          {
-            social.map(({ label, href, path }) => (
-              <a class="rail-icon" href={href} aria-label={label} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer">
-                <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24"><path d={path} /></svg>
-              </a>
-            ))
-          }
-        </div>
-      </nav>
-    </header>
+<Base title={`${name} | Full-stack software developer`} description={`${name}, full-stack software developer. I build the tools engineers use.`}>
+  <main>
+    <section class="intro" id="intro" aria-labelledby="intro-title">
+      <canvas class="sphere" aria-hidden="true" data-sphere></canvas>
 
-    <button class="theme-toggle" type="button" aria-label="Toggle theme" data-theme-toggle>
-      <svg aria-hidden="true" width="38" height="38" viewBox="0 0 38 38">
-        <defs>
-          <mask id="theme-toggle-mask">
-            <circle class="toggle-circle" data-mask="true" cx="19" cy="19" r="13"></circle>
-            <circle class="toggle-mask" cx="25" cy="14" r="9"></circle>
-          </mask>
-        </defs>
-        <path class="toggle-rays" d="M19 3v7M19 35v-7M32.856 11l-6.062 3.5M5.144 27l6.062-3.5M5.144 11l6.062 3.5M32.856 27l-6.062-3.5"></path>
-        <circle class="toggle-circle" mask="url(#theme-toggle-mask)" cx="19" cy="19" r="12"></circle>
-      </svg>
-    </button>
-
-    <main>
-      <section class="intro" id="intro" aria-labelledby="intro-title">
-        <canvas class="sphere" aria-hidden="true" data-sphere></canvas>
-
-        <header class="intro-text">
-          <h1 class="intro-name" id="intro-title" data-intro-name>
-            <span class="visually-hidden">{name}</span>
-            <span aria-hidden="true" data-decode>{name}</span>
-          </h1>
-          <h2 class="intro-title" data-title>
-            <span class="visually-hidden">{`${role} + ${rolesLabel}`}</span>
-            <span aria-hidden="true" class="intro-row">
-              <span class="intro-word" data-stage style="--delay: 200ms">{role}</span>
-              <span class="intro-line" data-stage></span>
-            </span>
-            <span aria-hidden="true" class="intro-row">
-              {roles.map((r, i) => <span class="intro-word" data-plus data-role data-status={i === 0 ? 'entered' : ''} style="--delay: 600ms">{r}</span>)}
-            </span>
-            <span aria-hidden="true" class="intro-sizer" data-title-sizer>
-              {roles.map(r => <span class="intro-word" data-plus>{r}</span>)}
-            </span>
-          </h2>
-          <div class="intro-pitch" data-stage>
-            <p>Full-stack software developer. I build the tools engineers use.</p>
-            <a class="button" href="/cv.pdf" download="Khang-Tran-CV.pdf">
-              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24"><path d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17zM5 19h14v2H5z" /></svg>
-              <span>Download CV</span>
-            </a>
-          </div>
-        </header>
-
-        <a class="scroll-cue" href="#projects" data-stage data-scroll-cue><span class="visually-hidden">Scroll to projects</span></a>
-        <a class="scroll-cue-mobile" href="#projects" data-stage data-scroll-cue>
-          <span class="visually-hidden">Scroll to projects</span>
-          <svg aria-hidden="true" stroke="currentColor" width="43" height="15" viewBox="0 0 43 15"><path d="M1 1l20.5 12L42 1" stroke-width="2" fill="none" /></svg>
-        </a>
-      </section>
-
-      <section class="projects" id="projects" aria-labelledby="projects-title">
-        <h2 class="visually-hidden" id="projects-title">Projects</h2>
-        {
-          projects.map(({ slug, title, description, visual }, i) => (
-            <article class="project" aria-labelledby={`project-${slug}`}>
-              <div class="project-text">
-                <span class="project-index">{String(i + 1).padStart(2, '0')}</span>
-                <h3 class="project-title" id={`project-${slug}`}>{title}</h3>
-                <p class="project-description">{description}</p>
-                <a class="button" href={`/projects/${slug}`}>
-                  View project<span class="visually-hidden">: {title}</span>
-                </a>
-              </div>
-              <div class="project-visual">
-                {visual.kind === 'diagram' ? (
-                  <svg class="diagram" role="img" aria-label={visual.label} viewBox="0 0 680 520">
-                    <g class="diagram-edges">{visual.edges.map(d => <path d={d} />)}</g>
-                    <g class="diagram-packets">{visual.edges.map(d => <path d={d} />)}</g>
-                    <g class="diagram-boxes">{visual.boxes.map(([x, y, width, height]) => <rect x={x} y={y} width={width} height={height} />)}</g>
-                    <g class="diagram-labels">{visual.labels.map(({ x, y, text, tone }) => <text x={x} y={y} data-tone={tone}>{text}</text>)}</g>
-                  </svg>
-                ) : (
-                  <div class="phone" role="img" aria-label={`${visual.placeholder} on a phone`}>{visual.placeholder}</div>
-                )}
-              </div>
-            </article>
-          ))
-        }
-      </section>
-
-      <section class="experience" id="experience" aria-labelledby="experience-title">
-        <div class="experience-head">
-          <h2 class="section-title" id="experience-title">Experience</h2>
+      <header class="intro-text">
+        <h1 class="intro-name" id="intro-title" data-intro-name>
+          <span class="visually-hidden">{name}</span>
+          <span aria-hidden="true" data-decode>{name}</span>
+        </h1>
+        <h2 class="intro-title" data-title>
+          <span class="visually-hidden">{`${role} + ${rolesLabel}`}</span>
+          <span aria-hidden="true" class="intro-row">
+            <span class="intro-word" data-stage style="--delay: 200ms">{role}</span>
+            <span class="intro-line" data-stage></span>
+          </span>
+          <span aria-hidden="true" class="intro-row">
+            {roles.map((r, i) => <span class="intro-word" data-plus data-role data-status={i === 0 ? 'entered' : ''} style="--delay: 600ms">{r}</span>)}
+          </span>
+          <span aria-hidden="true" class="intro-sizer" data-title-sizer>
+            {roles.map(r => <span class="intro-word" data-plus>{r}</span>)}
+          </span>
+        </h2>
+        <div class="intro-pitch" data-stage>
+          <p>Full-stack software developer. I build the tools engineers use.</p>
           <a class="button" href="/cv.pdf" download="Khang-Tran-CV.pdf">
             <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24"><path d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17zM5 19h14v2H5z" /></svg>
             <span>Download CV</span>
           </a>
         </div>
-        <ol class="experience-list">
-          {
-            experience.map(({ title, company, dates, highlights }, i) => (
-              <li class="experience-role" data-current={i === 0 ? 'true' : undefined}>
-                <p class="experience-dates">{dates}</p>
-                <div class="experience-marker" aria-hidden="true"></div>
-                <div class="experience-body">
-                  <h3>{title}</h3>
-                  <p class="experience-company">{company}</p>
-                  <ul>
-                    {highlights.map(h => <li>{h}</li>)}
-                  </ul>
-                </div>
-              </li>
-            ))
-          }
-        </ol>
-      </section>
+      </header>
 
-      <section class="about" id="about" aria-labelledby="about-title">
-        <h2 class="section-title" id="about-title">About</h2>
-        <div class="about-text">
-          {about.map(p => <p>{p}</p>)}
-        </div>
-      </section>
-    </main>
+      <a class="scroll-cue" href="#projects" data-stage data-scroll-cue><span class="visually-hidden">Scroll to projects</span></a>
+      <a class="scroll-cue-mobile" href="#projects" data-stage data-scroll-cue>
+        <span class="visually-hidden">Scroll to projects</span>
+        <svg aria-hidden="true" stroke="currentColor" width="43" height="15" viewBox="0 0 43 15"><path d="M1 1l20.5 12L42 1" stroke-width="2" fill="none" /></svg>
+      </a>
+    </section>
 
-    <footer class="contact" id="contact" aria-labelledby="contact-title">
-      <h2 class="section-title" id="contact-title">Contact</h2>
-      <p class="contact-pitch">{contactPitch}</p>
-      <div class="contact-actions">
-        <a class="button" href={email.href}>
-          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24"><path d={email.path} /></svg>
-          <span>Send me an email</span>
+    <section class="projects" id="projects" aria-labelledby="projects-title">
+      <h2 class="visually-hidden" id="projects-title">Projects</h2>
+      {
+        projects.map(({ slug, title, description, visual }, i) => (
+          <article class="project" aria-labelledby={`project-${slug}`}>
+            <div class="project-text">
+              <span class="project-index">{String(i + 1).padStart(2, '0')}</span>
+              <h3 class="project-title" id={`project-${slug}`}>{title}</h3>
+              <p class="project-description">{description}</p>
+              <a class="button" href={`/projects/${slug}`}>
+                View project<span class="visually-hidden">: {title}</span>
+              </a>
+            </div>
+            <ProjectVisual visual={visual} />
+          </article>
+        ))
+      }
+    </section>
+
+    <section class="experience" id="experience" aria-labelledby="experience-title">
+      <div class="experience-head">
+        <h2 class="section-title" id="experience-title">Experience</h2>
+        <a class="button" href="/cv.pdf" download="Khang-Tran-CV.pdf">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24"><path d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17zM5 19h14v2H5z" /></svg>
+          <span>Download CV</span>
         </a>
-        <ul class="contact-links">
-          {
-            elsewhere.map(({ label, href, path }) => (
-              <li>
-                <a href={href} target="_blank" rel="noopener noreferrer">
-                  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24"><path d={path} /></svg>
-                  <span>{label}</span>
-                </a>
-              </li>
-            ))
-          }
-        </ul>
       </div>
-      <p class="contact-meta">© {new Date().getFullYear()} {name}</p>
-    </footer>
+      <ol class="experience-list">
+        {
+          experience.map(({ title, company, dates, highlights }, i) => (
+            <li class="experience-role" data-current={i === 0 ? 'true' : undefined}>
+              <p class="experience-dates">{dates}</p>
+              <div class="experience-marker" aria-hidden="true"></div>
+              <div class="experience-body">
+                <h3>{title}</h3>
+                <p class="experience-company">{company}</p>
+                <ul>
+                  {highlights.map(h => <li>{h}</li>)}
+                </ul>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
 
-    <script>
-      import '../scripts/page';
-    </script>
-  </body>
-</html>
+    <section class="about" id="about" aria-labelledby="about-title">
+      <h2 class="section-title" id="about-title">About</h2>
+      <div class="prose">
+        {about.map(p => <p>{p}</p>)}
+      </div>
+    </section>
+  </main>
+
+  <footer class="contact" id="contact" aria-labelledby="contact-title">
+    <h2 class="section-title" id="contact-title">Contact</h2>
+    <p class="contact-pitch">{contactPitch}</p>
+    <div class="contact-actions">
+      <a class="button" href={email.href}>
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24"><path d={email.path} /></svg>
+        <span>Send me an email</span>
+      </a>
+      <ul class="contact-links">
+        {
+          elsewhere.map(({ label, href, path }) => (
+            <li>
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24"><path d={path} /></svg>
+                <span>{label}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+    <p class="contact-meta">© {new Date().getFullYear()} {name}</p>
+  </footer>
+
+  <script>
+    import '../scripts/page';
+  </script>
+</Base>

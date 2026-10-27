@@ -29,10 +29,10 @@ const show = id => `document.getElementById('${id}').scrollIntoView()`;
 const showExperience = show('experience');
 // returns an error string when the section runs past the viewport or its text drops below 4.5:1 (wcag aa).
 // colours go through a 1px canvas so color-mix and translucent text are composited as the browser draws them
-const readable = (id, text) => `(() => {
-  const section = document.getElementById('${id}');
+const readable = (selector, text) => `(() => {
+  const section = document.querySelector('${selector}');
   const over = [...section.querySelectorAll('*')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5);
-  if (over) return '${id} overflows: .' + over.className + ' ends at ' + Math.round(over.getBoundingClientRect().right) + 'px > ' + innerWidth + 'px';
+  if (over) return '${selector} overflows: .' + over.className + ' ends at ' + Math.round(over.getBoundingClientRect().right) + 'px > ' + innerWidth + 'px';
   const ctx = Object.assign(document.createElement('canvas'), { width: 1, height: 1 }).getContext('2d', { willReadFrequently: true });
   const paint = (...colors) => {
     ctx.clearRect(0, 0, 1, 1);
@@ -49,7 +49,7 @@ const readable = (id, text) => `(() => {
     .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
   const bg = getComputedStyle(document.body).backgroundColor;
   const unmatched = '${text}'.split(',').find(selector => !section.querySelector(selector));
-  if (unmatched) return '${id}: ' + unmatched + ' matches nothing, so its contrast is unchecked';
+  if (unmatched) return '${selector}: ' + unmatched + ' matches nothing, so its contrast is unchecked';
   const low = [...section.querySelectorAll('${text}')]
     .map(el => {
       const [a, b] = [luminance(paint(bg)), luminance(paint(bg, getComputedStyle(el).color))];
@@ -61,15 +61,20 @@ const readable = (id, text) => `(() => {
 
 // returns an error string when the project visuals differ in size or anything spills out
 const projectsFit = `(() => {
-  const boxes = [...document.querySelectorAll('.project-visual')].map(b => b.getBoundingClientRect());
+  const rows = document.querySelectorAll('#projects .project').length;
+  const boxes = [...document.querySelectorAll('#projects .project-visual')].map(b => b.getBoundingClientRect());
   const size = b => Math.round(b.width) + 'x' + Math.round(b.height);
-  if (boxes.length !== 4) return 'expected 4 project visuals, found ' + boxes.length;
+  if (!rows || boxes.length !== rows) return 'expected one visual per project row, found ' + boxes.length + ' for ' + rows;
   if (new Set(boxes.map(size)).size > 1) return 'project visuals differ: ' + boxes.map(size).join(', ');
   const wide = [...document.querySelectorAll('#projects *')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5);
   if (wide) return 'runs past the viewport: ' + wide.tagName + '.' + wide.getAttribute('class');
   const spill = [...document.querySelectorAll('.phone')].find(p => p.scrollWidth > p.clientWidth || p.scrollHeight > p.clientHeight);
   return spill ? 'placeholder spills out of its phone: ' + spill.textContent : '';
 })()`;
+// returns an error string naming any project link that does not load
+const projectLinksLoad = `Promise.all([...document.querySelectorAll('#projects .button')].map(a => fetch(a.href).then(r => r.ok ? '' : a.getAttribute('href') + ' ' + r.status)))
+  .then(failed => failed.filter(Boolean).join(', '))`;
+const caseText = 'h1, .project-description, .case-facts dt, .case-facts dd, .case-section h2, .prose p, .case-back, .case-next-label, .case-next-title';
 const packetsStill = `getComputedStyle(document.querySelector('.diagram-packets')).animationName === 'none' ? '' : 'packets animate under reduced motion'`;
 
 const SCENARIOS = [
@@ -83,9 +88,23 @@ const SCENARIOS = [
   { name: 'projects-light', viewport: desktop, waitMs: 1500, eval: toggleTheme, clip: '#projects', check: projectsFit },
   { name: 'projects-phone-390', viewport: phone, waitMs: 1500, clip: '#projects', check: projectsFit },
   { name: 'projects-phone-light', viewport: phone, waitMs: 1500, eval: toggleTheme, clip: '#projects', check: projectsFit },
+  { name: 'project-links', viewport: desktop, waitMs: 500, check: projectLinksLoad, step: 'every View project link loads' },
+  ...['arc', 'siem', 'opal'].flatMap(slug => [
+    [`case-${slug}`, desktop, false],
+    [`case-${slug}-phone-390-light`, phone, true],
+  ].map(([name, viewport, light]) => ({
+    name,
+    viewport,
+    page: `projects/${slug}`,
+    waitMs: 1000,
+    eval: light ? toggleTheme : undefined,
+    check: readable('.case', caseText),
+    clip: '.case',
+    step: `${slug} case study at ${viewport.width}px, ${light ? 'light' : 'dark'}: fits the width, text at 4.5:1 or more`,
+  }))),
   ...[
     ['experience', 'h2, h3, .experience-dates, .experience-company, .experience-body li'],
-    ['about', 'h2, .about-text p'],
+    ['about', 'h2, .prose p'],
     ['contact', 'h2, .contact-pitch, .contact-links a, .contact-meta'],
   ].flatMap(([id, text]) => [
     [id, desktop, false],
@@ -97,7 +116,7 @@ const SCENARIOS = [
     viewport,
     waitMs: 1500,
     eval: light ? `${toggleTheme}; ${show(id)}` : show(id),
-    check: readable(id, text),
+    check: readable(`#${id}`, text),
     clip: `#${id}`,
     step: `${id} section at ${viewport.width}px, ${light ? 'light' : 'dark'}: fits the width, text at 4.5:1 or more`,
   }))),
@@ -187,12 +206,12 @@ try {
     await send('Emulation.setEmulatedMedia', {
       features: [{ name: 'prefers-reduced-motion', value: s.reduced ? 'reduce' : 'no-preference' }],
     }, sessionId);
-    await send('Page.navigate', { url: BASE_URL }, sessionId);
+    await send('Page.navigate', { url: new URL(s.page ?? '', BASE_URL).href }, sessionId);
     await sleep(800);
     if (s.eval) await send('Runtime.evaluate', { expression: s.eval }, sessionId);
     await sleep(s.waitMs);
     if (s.check) {
-      const { result, exceptionDetails } = await send('Runtime.evaluate', { expression: s.check, returnByValue: true }, sessionId);
+      const { result, exceptionDetails } = await send('Runtime.evaluate', { expression: s.check, returnByValue: true, awaitPromise: true }, sessionId);
       // a check that throws must fail, not read as a pass
       if (exceptionDetails) errors.push(`${s.name}: check threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
       else if (result.value) errors.push(`${s.name}: ${result.value}`);

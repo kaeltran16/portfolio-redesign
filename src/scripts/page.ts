@@ -108,10 +108,9 @@ import('./sphere')
 
 // --- theme -------------------------------------------------------------------------------------
 
-$('[data-theme-toggle]').addEventListener('click', () => {
-  theme = theme === 'dark' ? 'light' : 'dark';
-  root.dataset.theme = theme;
-  localStorage.setItem('theme', theme);
+// the toggle itself is in theme.ts, shared with the case-study pages
+document.addEventListener('themechange', () => {
+  theme = root.dataset.theme as Theme;
   sphere?.setTheme(theme);
   // the original replays the whole intro on a theme change
   playIntro();

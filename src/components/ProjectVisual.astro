@@ -1,0 +1,18 @@
+---
+import type { Visual } from '../data';
+
+const { visual } = Astro.props as { visual: Visual };
+---
+
+<div class="project-visual">
+  {visual.kind === 'diagram' ? (
+    <svg class="diagram" role="img" aria-label={visual.label} viewBox="0 0 680 520">
+      <g class="diagram-edges">{visual.edges.map(d => <path d={d} />)}</g>
+      <g class="diagram-packets">{visual.edges.map(d => <path d={d} />)}</g>
+      <g class="diagram-boxes">{visual.boxes.map(([x, y, width, height]) => <rect x={x} y={y} width={width} height={height} />)}</g>
+      <g class="diagram-labels">{visual.labels.map(({ x, y, text, tone }) => <text x={x} y={y} data-tone={tone}>{text}</text>)}</g>
+    </svg>
+  ) : (
+    <div class="phone" role="img" aria-label={`${visual.placeholder} on a phone`}>{visual.placeholder}</div>
+  )}
+</div>
