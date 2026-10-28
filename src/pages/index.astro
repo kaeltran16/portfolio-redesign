@@ -6,25 +6,30 @@ import { name, projects, role, social } from '../data';
 const roles = ['Developer', 'Backend engineer', 'Frontend engineer', 'Tool builder'];
 const rolesLabel = `${roles.slice(0, -1).join(', ')}, and ${roles.at(-1)}`;
 
-// placeholders from the experience canvas until the real cv lands; the first entry is the current role
+// copied from the cv (public/cv.pdf, built from job-search/resume_v2.md path b); keep the two in step.
+// the first entry is the current role
 const experience = [
   {
-    title: '[Current role]',
-    company: '[Company A]',
-    dates: '[2023] – now',
-    highlights: ['[What you built or owned, and what it changed]', '[A second highlight, ideally with a number you can stand behind]', '[A third highlight]'],
+    title: 'Full-stack Engineer',
+    company: 'MozoX',
+    dates: 'Apr 2023 – now',
+    highlights: [
+      'Shipped production LLM features for a multi-tenant enterprise SIEM platform processing ~1,000 security events/sec: an AI log parser mapping arbitrary log sources to schema fields with no hand-written parser (new-source onboarding from ~7 days to minutes; ~20% of total log volume now parsed by the AI pipeline), natural-language-to-query search, and AI-generated multilingual executive reports.',
+      'Built an AI correlation engine combining Isolation Forest, autoencoder, and Z-score models with automated MITRE ATT&CK mapping for real-time, multi-tenant threat detection.',
+      'Built full-stack across the platform (Next.js/React, Java + Python, PostgreSQL + Elasticsearch); integrated 4+ security-vendor log sources (Check Point, F5, CrowdStrike, VMware ESXi) and MITRE ATT&CK analytics dashboards.',
+      'Initiated and led a web-application modernization effort (dependency upgrades, tech-debt reduction) with zero disruption to the live system; built centralized cross-component system-log monitoring.',
+      'Prototyped an IoT + LLM/RAG platform for durian cultivation: sensor-stream ingestion, ML harvest prediction, and natural-language queries over farm data; built and validated before the product line was discontinued.',
+    ],
   },
   {
-    title: '[Previous role]',
-    company: '[Company B]',
-    dates: '[2021] – [2023]',
-    highlights: ['[What you built or owned, and what it changed]', '[A second highlight]'],
-  },
-  {
-    title: '[Earlier role]',
-    company: '[Company C]',
-    dates: '[2019] – [2021]',
-    highlights: ['[What you built or owned, and what it changed]'],
+    title: 'Full-stack Engineer',
+    company: 'CNG',
+    dates: 'Mar 2022 – Apr 2023',
+    highlights: [
+      'Led a team of 3 to build a property-search web app (Next.js, Tailwind, Nest.js, Mapbox) letting users browse and buy properties on an interactive map.',
+      'Implemented geospatial computation and vector-tile rendering to display property polygons on Mapbox.',
+      "Translated business requirements into technical specs, decomposed them into components, and reviewed teammates' code across architecture, implementation, testing, and deployment.",
+    ],
   },
 ];
 
