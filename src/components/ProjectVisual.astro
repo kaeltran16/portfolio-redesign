@@ -1,4 +1,5 @@
 ---
+import { Image } from 'astro:assets';
 import type { Visual } from '../data';
 
 const { visual } = Astro.props as { visual: Visual };
@@ -13,6 +14,8 @@ const { visual } = Astro.props as { visual: Visual };
       <g class="diagram-labels">{visual.labels.map(({ x, y, text, tone }) => <text x={x} y={y} data-tone={tone}>{text}</text>)}</g>
     </svg>
   ) : (
-    <div class="phone" role="img" aria-label={`${visual.placeholder} on a phone`}>{visual.placeholder}</div>
+    <div class="phone">
+      <Image src={visual.image} alt={visual.alt} widths={[230, 460, 690]} sizes="230px" />
+    </div>
   )}
 </div>

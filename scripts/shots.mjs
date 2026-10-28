@@ -59,8 +59,13 @@ const readable = (selector, text) => `(() => {
   return low.map(({ el, ratio }) => (el.className || el.tagName) + ' contrast ' + ratio.toFixed(2) + ':1').join(', ');
 })()`;
 
-// returns an error string when the project visuals differ in size or anything spills out
-const projectsFit = `(() => {
+// returns an error string when the project visuals differ in size, anything spills out, or a phone screenshot
+// fails to load. the screenshots are lazy and the clip never scrolls to them, so they are forced to load first
+const projectsFit = `(async () => {
+  for (const img of document.querySelectorAll('#projects .phone img')) {
+    img.loading = 'eager';
+    try { await img.decode(); } catch { return 'phone screenshot does not load: ' + img.currentSrc; }
+  }
   const rows = document.querySelectorAll('#projects .project').length;
   const boxes = [...document.querySelectorAll('#projects .project-visual')].map(b => b.getBoundingClientRect());
   const size = b => Math.round(b.width) + 'x' + Math.round(b.height);
@@ -69,7 +74,7 @@ const projectsFit = `(() => {
   const wide = [...document.querySelectorAll('#projects *')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5);
   if (wide) return 'runs past the viewport: ' + wide.tagName + '.' + wide.getAttribute('class');
   const spill = [...document.querySelectorAll('.phone')].find(p => p.scrollWidth > p.clientWidth || p.scrollHeight > p.clientHeight);
-  return spill ? 'placeholder spills out of its phone: ' + spill.textContent : '';
+  return spill ? 'screenshot spills out of its phone: ' + spill.querySelector('img')?.alt : '';
 })()`;
 // returns an error string naming any project link that does not load
 const projectLinksLoad = `Promise.all([...document.querySelectorAll('#projects .button')].map(a => fetch(a.href).then(r => r.ok ? '' : a.getAttribute('href') + ' ' + r.status)))

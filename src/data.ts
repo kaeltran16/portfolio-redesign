@@ -1,4 +1,6 @@
 // shared by Home and the case-study pages. bracketed text is a placeholder until khang supplies the real copy and media.
+import type { ImageMetadata } from 'astro';
+import opalToday from './assets/opal-today.png';
 
 export const name = 'Khang Tran';
 export const role = 'Full-stack';
@@ -26,7 +28,7 @@ export const social = [
 type Label = { x: number; y: number; text: string; tone?: 'primary' | 'caption' };
 export type Visual =
   | { kind: 'diagram'; label: string; edges: string[]; boxes: [number, number, number, number][]; labels: Label[] }
-  | { kind: 'phone'; placeholder: string };
+  | { kind: 'phone'; image: ImageMetadata; alt: string };
 type Project = {
   slug: string;
   title: string;
@@ -138,7 +140,12 @@ export const projects: Project[] = [
     slug: 'opal',
     title: 'opal',
     description: 'One app for money, movement, and the little rituals that hold your day together.',
-    visual: { kind: 'phone', placeholder: '[opal screenshot]' },
+    // captured from the web build with seed data (dart_defines/dev.json), not real personal data
+    visual: {
+      kind: 'phone',
+      image: opalToday,
+      alt: "opal's Today screen: Pal suggests moving leg day to Friday because of rain, above the day's rituals",
+    },
     facts: [
       { label: 'Role', value: 'Solo, personal project' },
       { label: 'When', value: 'June 2026 – now' },

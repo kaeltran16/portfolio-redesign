@@ -778,20 +778,22 @@ body {
 
 /* a flat phone at the canvas size (250x510, 10px bezel, 40px corners) in the 680-wide box */
 .phone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: calc(100cqw * 250 / 680);
   height: calc(100cqw * 510 / 680);
-  padding: var(--spaceM);
+  overflow: hidden;
   border: calc(100cqw * 10 / 680) solid color-mix(in lab, var(--text) 10%, var(--background));
   border-radius: calc(100cqw * 40 / 680);
   background: color-mix(in lab, var(--text) 3%, var(--background));
   box-shadow: 0 40px 80px color-mix(in lab, var(--black) 40%, transparent);
-  font-family: var(--monoFontStack);
-  font-size: calc((13 / 16) * 1rem);
-  text-align: center;
-  color: var(--textLight);
+}
+
+/* the capture is a touch taller than the screen, so it is cropped from the bottom */
+.phone img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
 }
 
 /* --- experience ------------------------------------------------------------------------------- */
