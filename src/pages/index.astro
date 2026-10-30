@@ -113,8 +113,8 @@ const contactPitch = 'Open to remote full-stack roles, and always happy to talk 
       </div>
       <ol class="experience-list">
         {
-          experience.map(({ title, company, dates, highlights }, i) => (
-            <li class="experience-role" data-current={i === 0 ? 'true' : undefined}>
+          experience.map(({ title, company, dates, highlights }) => (
+            <li class="experience-role">
               <p class="experience-dates">{dates}</p>
               <div class="experience-marker" aria-hidden="true"></div>
               <div class="experience-body">
