@@ -31,7 +31,7 @@ Khang finds the site primitive because there is too little interaction, and want
 - Astro 7 + vanilla TypeScript; dependencies are `astro`, `three`, two `@fontsource` fonts. Keep it that way.
 - Tokens live in `src/styles/global.css` (`--durationM`, `--bezierFastoutSlowin`, `--accent`, ...); reuse them.
 - Dark and light themes both work (`[data-theme]` on `<html>`, toggled by `src/scripts/theme.ts`).
-- Rows stack (visual above text) below 1040px (`.project` media query in `global.css`); "phone" below means that stacked layout.
+- Rows stack (visual above text) at 1040px and below (`.project` media query `max-width: 1040px` in `global.css`); "phone" below means that stacked layout.
 - `prefers-reduced-motion: reduce` already kills all animations and transitions globally (`global.css` ~line 1096) and `page.ts` reads it once into `reduceMotion` (line 10).
 - Verification is `npm test` (vitest), `npm run build`, and `npm run shots` (Chrome via CDP against the dev server on `localhost:4321`, which must be running first).
 
@@ -57,13 +57,13 @@ Shared by the pinned project rows (desktop):
 
 **Experience** (no pin): the timeline line fills with accent from the top as the section scrolls through the screen, and each role's square marker fills when the line reaches it. Today each role draws its own line segment (`.experience-marker::after`) and only the current role's marker is filled (`[data-current]`); the builder may restructure this so one continuous line can fill. When fully drawn, the line is accent and every marker is filled, as in the last frame of `Experience.dc.html`; the current role no longer stands out by its marker.
 
-## Phones (stacked rows, below 1040px) and short windows
+## Phones (stacked rows, 1040px and below) and short windows
 
-Pinning needs room: a row pins only when the window is at least 1040px wide **and** tall enough to show the whole pinned row (text column, visual, step caption and, for opal, the screen names) without clipping. Measure the row; do not hard-code a height. A window that fails either test uses the unpinned mode below. (Agent's call, builder question 2: the spec already promises text is never hidden, and the unpinned mode already exists.)
+Pinning needs room: a row pins only when the window is wider than 1040px **and** tall enough to show the whole pinned row (text column, visual, step caption and, for opal, the screen names) without clipping. Measure the row; do not hard-code a height. A window that fails either test uses the unpinned mode below. (Agent's call, builder question 2: the spec already promises text is never hidden, and the unpinned mode already exists.)
 
 Nothing pins. Each step plays as the visual moves up through the screen, driven by the same progress-to-step function as desktop, fed by the visual's position on screen instead of the pin. The text under the visual is never covered.
 
-SIEM card on narrow screens (Agent's call, builder question 1): when the visual box is too narrow for the card beside the diagram (decide with a container query on the scene figure that wraps `.project-visual` and its captions; about 560px wide is the starting point, tuned so the card's longest line does not wrap), the diagram recentres (box x back to 200) and the card sits under the diagram's 680x520 box at full width, inside the scene figure and above the step caption, showing the lit stage's event. It does not go inside the box: fitting it there would shrink the diagram to about 4px labels at 390px (Khang approved, 2026-10-30). The tick joining card and stage is dropped in this layout. The box keeps its size, so `projectsFit` keeps passing. Khang chose this over pinning on phones and over no scenes on phones.
+SIEM card on narrow screens (Agent's call, builder question 1): when the visual box is too narrow for the card beside the diagram (decide with a container query on the scene figure that wraps `.project-visual` and its captions; about 560px wide is the starting point, tuned so the card's longest line does not wrap; it landed at 648px), the diagram recentres (box x back to 200) and the card sits under the diagram's 680x520 box at full width, inside the scene figure and above the step caption, showing the lit stage's event. It does not go inside the box: fitting it there would shrink the diagram to about 4px labels at 390px (Khang approved, 2026-10-30). The tick joining card and stage is dropped in this layout. The box keeps its size, so `projectsFit` keeps passing. Khang chose this over pinning on phones and over no scenes on phones.
 
 ## Reduced motion
 
@@ -74,7 +74,7 @@ Nothing pins and nothing steps. Each visual shows its last frame (whole diagram 
 Chosen by Khang after an independent judge weighed six approaches: **a sticky row, with scroll progress setting `data-step`.**
 
 - No wrapper element: the `.project` grid itself becomes the tall scroll track while pinned, and its two columns (text and visual) are `position: sticky`. A wrapper per row would put each row alone in its parent and break the `.project:nth-of-type(even)` left/right alternation (Khang approved, 2026-10-30). Scroll length per row is roughly one viewport per step.
-- One passive scroll listener (there is already one in `src/scripts/page.ts`, lines 121-123, for the scroll cue) computes each row's 0..1 progress through its pinned scroll, maps it to a step, and writes `data-step` on the row. Below 1040px progress comes from the visual's position on screen instead.
+- One passive scroll listener (there is already one in `src/scripts/page.ts`, lines 121-123, for the scroll cue) computes each row's 0..1 progress through its pinned scroll, maps it to a step, and writes `data-step` on the row. At 1040px and below progress comes from the visual's position on screen instead.
 - CSS reacts to `data-step` with transitions (opacity, the SIEM card's position, the phone screen's slide, the caption). Packets stay the existing CSS keyframe (`diagram-flow`), shown only on edges whose step is reached.
 - Without JS, or before the script runs, each visual shows its finished state (no pin, no faint elements). Home lists the step captions under the visual, the same static mode as reduced motion, so no-JS visitors lose no content (Khang approved, 2026-10-30). Case pages render the visual exactly as today, with no captions.
 - Put the progress-to-step mapping in a pure function in `src/lib/` so it can be unit tested like `src/lib/decode.ts`.
