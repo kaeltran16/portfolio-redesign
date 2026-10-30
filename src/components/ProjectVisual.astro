@@ -1,13 +1,13 @@
 ---
 import { Image } from 'astro:assets';
 import type { Visual } from '../data';
+import ArcCockpit from './ArcCockpit.astro';
 import SiemConsole from './SiemConsole.astro';
 import '../styles/scenes.css';
 
 // `still` renders the finished visual with no steps, as the case pages show it
 const { visual, still = false } = Astro.props as { visual: Visual; still?: boolean };
-const captions =
-  still || visual.kind === 'phone' ? [] : visual.kind === 'diagram' ? visual.captions : visual.steps.map(s => s.caption);
+const captions = still || visual.kind === 'phone' ? [] : visual.steps.map(s => s.caption);
 const scene = captions.length > 0;
 const steps = captions.length;
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -17,25 +17,8 @@ const wrap = scene ? { class: 'scene', 'data-steps': steps } : {};
 
 <Wrap {...wrap}>
   <div class="project-visual">
-    {visual.kind === 'diagram' ? (
-      <svg class="diagram" role="img" aria-label={visual.label} viewBox="0 0 680 520">
-        <g class="diagram-body">
-          <g class="diagram-edges">{visual.edges.map(({ d, at }) => <path d={d} data-at={scene ? at : undefined} />)}</g>
-          <g class="diagram-packets">{visual.edges.map(({ d, at }) => <path d={d} data-at={scene ? at : undefined} />)}</g>
-          <g class="diagram-boxes">
-            {visual.boxes.map(({ rect: [x, y, width, height], at }) => (
-              <rect x={x} y={y} width={width} height={height} data-at={scene ? at : undefined} />
-            ))}
-          </g>
-          <g class="diagram-labels">
-            {visual.labels.map(({ x, y, text, tone, at }) => (
-              <text x={x} y={y} data-tone={tone} data-at={scene ? at : undefined}>{text}</text>
-            ))}
-          </g>
-        </g>
-      </svg>
-    ) : visual.kind === 'console' ? (
-      <SiemConsole visual={visual} scene={scene} />
+    {visual.kind === 'console' ? (
+      visual.product === 'siem' ? <SiemConsole visual={visual} scene={scene} /> : <ArcCockpit visual={visual} scene={scene} />
     ) : (
       <div class="phone">
         <Image src={visual.image} alt={visual.alt} widths={[230, 460, 690]} sizes="230px" />

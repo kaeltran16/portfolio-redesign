@@ -714,7 +714,7 @@ body {
   line-height: 1.6;
 }
 
-/* every visual sits in the same box so rows line up; it is the diagrams' viewBox */
+/* every visual sits in the same box so rows line up; the consoles are drawn to its 680px width */
 .project-visual {
   grid-area: visual;
   justify-self: center;
@@ -725,56 +725,6 @@ body {
   align-items: center;
   justify-content: center;
   container-type: inline-size;
-}
-
-/* the dash period, so one loop moves each packet exactly one gap along */
-@keyframes diagram-flow {
-  to { stroke-dashoffset: -66; }
-}
-
-.diagram {
-  display: block;
-  width: 100%;
-  height: 100%;
-  font-family: var(--monoFontStack);
-}
-
-.diagram-edges {
-  fill: none;
-  stroke: color-mix(in lab, var(--text) 25%, transparent);
-  stroke-width: 1.5;
-}
-
-.diagram-packets {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-dasharray: 6 60;
-  animation: diagram-flow 2.4s linear infinite;
-}
-
-.diagram-boxes {
-  fill: color-mix(in lab, var(--text) 4%, transparent);
-  stroke: color-mix(in lab, var(--text) 35%, transparent);
-  stroke-width: 1;
-}
-
-.diagram-labels {
-  fill: color-mix(in lab, var(--text) 85%, transparent);
-  font-size: 16px;
-  text-anchor: middle;
-  dominant-baseline: central;
-
-  [data-tone='primary'] {
-    fill: var(--primary);
-  }
-
-  [data-tone='caption'] {
-    fill: var(--textLight);
-    font-size: 13px;
-    text-anchor: start;
-    dominant-baseline: auto;
-  }
 }
 
 /* a flat phone at the canvas size (250x510, 10px bezel, 40px corners) in the 680-wide box */

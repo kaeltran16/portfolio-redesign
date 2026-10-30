@@ -31,11 +31,20 @@ const titleFits = `(() => {
 })()`;
 const show = id => `document.getElementById('${id}').scrollIntoView()`;
 const showExperience = show('experience');
+// page-side: content clipped by an ancestor below root, such as a visually hidden step caption, cannot run past;
+// the ancestor is checked itself
+const clippedKit = `
+  const clipped = (el, root) => {
+    for (let a = el.parentElement; a && a !== root; a = a.parentElement) if (/hidden|clip/.test(getComputedStyle(a).overflowX)) return true;
+    return false;
+  };
+`;
 // returns an error string when the section runs past the viewport or its text drops below 4.5:1 (wcag aa).
 // colours go through a 1px canvas so color-mix and translucent text are composited as the browser draws them
 const readable = (selector, text) => `(() => {
+  ${clippedKit}
   const section = document.querySelector('${selector}');
-  const over = [...section.querySelectorAll('*')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5);
+  const over = [...section.querySelectorAll('*')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5 && !clipped(el, section));
   if (over) return '${selector} overflows: .' + over.className + ' ends at ' + Math.round(over.getBoundingClientRect().right) + 'px > ' + innerWidth + 'px';
   const ctx = Object.assign(document.createElement('canvas'), { width: 1, height: 1 }).getContext('2d', { willReadFrequently: true });
   const paint = (...colors) => {
@@ -75,12 +84,9 @@ const projectsFit = `(async () => {
   const size = b => Math.round(b.width) + 'x' + Math.round(b.height);
   if (!rows || boxes.length !== rows) return 'expected one visual per project row, found ' + boxes.length + ' for ' + rows;
   if (new Set(boxes.map(size)).size > 1) return 'project visuals differ: ' + boxes.map(size).join(', ');
-  // content clipped by an ancestor, such as a visually hidden step caption, cannot run past; the ancestor is checked itself
-  const clipped = el => {
-    for (let a = el.parentElement; a.id !== 'projects'; a = a.parentElement) if (/hidden|clip/.test(getComputedStyle(a).overflowX)) return true;
-    return false;
-  };
-  const wide = [...document.querySelectorAll('#projects *')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5 && !clipped(el));
+  ${clippedKit}
+  const projects = document.getElementById('projects');
+  const wide = [...projects.querySelectorAll('*')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5 && !clipped(el, projects));
   if (wide) return 'runs past the viewport: ' + wide.tagName + '.' + wide.getAttribute('class');
   const spill = [...document.querySelectorAll('.phone')].find(p => p.scrollWidth > p.clientWidth || p.scrollHeight > p.clientHeight);
   return spill ? 'screenshot spills out of its phone: ' + spill.querySelector('img')?.alt : '';
@@ -89,7 +95,7 @@ const projectsFit = `(async () => {
 const projectLinksLoad = `Promise.all([...document.querySelectorAll('#projects .button')].map(a => fetch(a.href).then(r => r.ok ? '' : a.getAttribute('href') + ' ' + r.status)))
   .then(failed => failed.filter(Boolean).join(', '))`;
 const caseText = 'h1, .project-description, .case-facts dt, .case-facts dd, .case-section h2, .prose p, .case-back, .case-next-label, .case-next-title';
-const packetsStill = `getComputedStyle(document.querySelector('.diagram-packets')).animationName === 'none' ? '' : 'packets animate under reduced motion'`;
+const pulsesStill = `[...document.querySelectorAll('.db-live i, .arc-pulse')].some(el => getComputedStyle(el).animationName !== 'none') ? 'a console pulse animates under reduced motion' : ''`;
 // joins checks that each return an error string or ''
 const allOf = (...checks) => `[${checks.join(', ')}].filter(Boolean).join('; ')`;
 const noScene = `document.querySelector('.scene, [data-at]') ? 'page renders scene markup' : ''`;
@@ -125,38 +131,28 @@ const sceneKit = `
   const at = el => Number(el.dataset.at);
   const onScreen = el => el.checkVisibility({ opacityProperty: true, visibilityProperty: true })
     && getComputedStyle(el).clipPath === 'none' && el.getBoundingClientRect().width > 1;
-  const litOf = root => [...root.querySelectorAll('.diagram :is(.diagram-edges, .diagram-boxes, .diagram-labels) [data-at]')];
   const opacityOf = el => getComputedStyle(el).opacity;
   const within = (inner, outer) => inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5
     && inner.top >= outer.top - 0.5 && inner.bottom <= outer.bottom + 0.5;
 `;
-// returns an error string unless the row shows step k: diagram elements ahead faint and packets on the reached
-// edges, or for the siem console only the k-th panel lit and the k-th command in its box, inside the box; and only
-// the k-th caption
+// returns an error string unless the row shows step k: only the console's k-th panel lit, its k-th command in the
+// box and the k-th caption, with the console inside its box
 const showsStep = (n, k) => `(() => {
   ${sceneKit}
   const row = document.querySelector('${row(n)}');
   const errors = [];
   if (row.dataset.step !== '${k}') errors.push('row is at step ' + row.dataset.step);
-  for (const el of litOf(row)) {
-    const want = at(el) > ${k} ? '0.12' : '1';
-    if (opacityOf(el) !== want) errors.push(el.tagName + ' of step ' + at(el) + ' has opacity ' + opacityOf(el) + ', not ' + want);
-  }
-  for (const el of row.querySelectorAll('.diagram-packets [data-at]')) {
-    const want = at(el) <= ${k} ? '1' : '0';
-    if (opacityOf(el) !== want) errors.push('packet of step ' + at(el) + ' has opacity ' + opacityOf(el) + ', not ' + want);
-  }
   for (const el of row.querySelectorAll('.console .p')) {
     const want = at(el) === ${k} ? '1' : '0.4';
     if (opacityOf(el) !== want) errors.push('panel of step ' + at(el) + ' has opacity ' + opacityOf(el) + ', not ' + want);
   }
-  const parts = ${n === SIEM} ? ['.scene-captions li', '.cmd-line'] : ['.scene-captions li'];
-  for (const part of parts) {
+  for (const part of ['.scene-captions li', '.cmd-line']) {
     const shown = [...row.querySelectorAll(part)].filter(onScreen).map(at);
     if (shown.join() !== '${k}') errors.push(part + ' shows steps [' + shown.join(', ') + '], not only ${k}');
   }
-  const dash = row.querySelector('.console')?.getBoundingClientRect();
-  if (dash && !within(dash, row.querySelector('.project-visual').getBoundingClientRect())) errors.push('console runs out of its box');
+  if (!within(row.querySelector('.console').getBoundingClientRect(), row.querySelector('.project-visual').getBoundingClientRect())) {
+    errors.push('console runs out of its box');
+  }
   return errors.join('; ');
 })()`;
 // returns an error string unless the row is pinned with its text sticky and its box in the viewport
@@ -170,10 +166,10 @@ const pinned = n => `(() => {
   if (!within(box, { left: 0, top: 0, right: innerWidth, bottom: innerHeight })) errors.push('box is not wholly in the viewport');
   return errors.join('; ');
 })()`;
-// the console keeps its own dark palette in both themes, like a screenshot, so only the captions are checked
+// the consoles keep their own dark palette in both themes, like a screenshot, so only the captions are checked
 const sceneText = '.scene-captions li span';
 const sceneScenarios = [
-  ...[1, 2, 3].map(k => [ARC, 'arc', k, false]),
+  ...[1, 2, 3, 4].map(k => [ARC, 'arc', k, false]),
   ...[1, 2, 3, 4, 5, 6].map(k => [SIEM, 'siem', k, false]),
   [ARC, 'arc', 2, true],
   [SIEM, 'siem', 3, true],
@@ -183,7 +179,7 @@ const sceneScenarios = [
   waitMs: 1000,
   eval: light ? `${toggleTheme}; ${toStep(n, k)}` : toStep(n, k),
   check: allOf(pinned(n), showsStep(n, k), readable(row(n), sceneText)),
-  step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 3 : 6}, ${light ? 'light' : 'dark'}: row pinned, ${slug === 'siem' ? `only panel ${k} lit and its command in the box` : 'elements ahead faint, packets on the reached edges'}, only caption ${k} shown, text at 4.5:1 or more`,
+  step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 4 : 6}, ${light ? 'light' : 'dark'}: row pinned, only panel ${k} lit and its command in the box, only caption ${k} shown, text at 4.5:1 or more`,
 }));
 
 // page-side helpers for the scroll checks
@@ -214,7 +210,7 @@ const unpinned = `(() => {
   if (stickies().length) errors.push(stickies().length + ' elements are sticky');
   return errors.join('; ');
 })()`;
-// a window shorter than the rows' content (arc's is about 507px at 1280 wide); `unpinned` checks that it still is
+// a window shorter than the rows' content at 1280 wide; `unpinned` checks that it still is
 const shortWindow = { width: 1280, height: 480, deviceScaleFactor: 1, mobile: false };
 // a tenth of the viewport either side of the timeline's reading line
 const CLEAR = 0.1;
@@ -267,7 +263,7 @@ const SCENARIOS = [
   { name: 'role-wipe', viewport: desktop, waitMs: 6200 },
   { name: 'light', viewport: desktop, waitMs: 6000, eval: toggleTheme },
   { name: 'phone-390', viewport: phone, waitMs: 6000, check: titleFits },
-  { name: 'reduced-motion', viewport: desktop, waitMs: 1500, reduced: true, check: packetsStill },
+  { name: 'reduced-motion', viewport: desktop, waitMs: 1500, reduced: true, check: pulsesStill },
   { name: 'projects', viewport: desktop, waitMs: 1500, clip: '#projects', check: projectsFit },
   { name: 'projects-light', viewport: desktop, waitMs: 1500, eval: toggleTheme, clip: '#projects', check: projectsFit },
   { name: 'projects-phone-390', viewport: phone, waitMs: 1500, clip: '#projects', check: projectsFit },
@@ -442,24 +438,22 @@ const SCENARIOS = [
       }
       ${show('projects')};
     })()`,
-    check: allOf(packetsStill, `(() => {
+    check: allOf(pulsesStill, `(() => {
       ${sceneKit}
       const projects = document.getElementById('projects');
       const errors = [];
       if (projects.querySelector('[data-step]')) errors.push('a row has a step under reduced motion');
       if (projects.querySelector('[data-pinned]')) errors.push('a row is pinned under reduced motion');
       if (document.querySelector('[data-drawing]')) errors.push('the timeline draws under reduced motion');
-      const dim = [...litOf(projects), ...projects.querySelectorAll('.diagram-packets [data-at]')].filter(el => opacityOf(el) !== '1');
-      if (dim.length) errors.push(dim.length + ' diagram elements are not fully lit');
       const hidden = [...projects.querySelectorAll('.scene-captions li')].filter(el => !onScreen(el));
       if (hidden.length) errors.push(hidden.length + ' step captions are not listed');
       const unlit = [...projects.querySelectorAll('.console .p')].filter(el => !onScreen(el) || opacityOf(el) !== '1');
       if (unlit.length) errors.push(unlit.length + ' console panels are not shown fully lit');
-      if ([...projects.querySelectorAll('.cmd')].some(onScreen)) errors.push('the siem command box shows');
+      if ([...projects.querySelectorAll('.cmd')].some(onScreen)) errors.push('a command box shows');
       return errors.join('; ');
     })()`),
     clip: '#projects',
-    step: 'scenes under reduced motion: no steps, every diagram and console panel lit, packets still, every caption listed, no command box',
+    step: 'scenes under reduced motion: no steps, every console panel lit, pulses still, every caption listed, no command box',
   },
   {
     name: 'scene-opal',

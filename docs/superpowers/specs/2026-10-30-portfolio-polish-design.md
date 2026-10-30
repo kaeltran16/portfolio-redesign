@@ -46,6 +46,8 @@ Shared by the pinned project rows (desktop):
 - Elements not yet reached are faint (the boards use opacity 0.12), not hidden, so the whole diagram's shape is visible from the start.
 - After the last step the row lets go and the page scrolls on.
 
+**Revised 2026-10-30, product consoles:** the Arc and SIEM diagrams are replaced by drawings of each product's screen (`ArcCockpit.astro`, `SiemConsole.astro`, styled by `console.css` and `cockpit.css`). In a step one panel lights and the step's command types into a box under the drawing; with no step every panel is lit and there is no box. SIEM has 6 steps (commit 963a1f2). Arc has 4, one run on this site's own code: its task graph, the agent at work, its question, its diff, drawn after captures of Arc's dev app. The `diagram` visual kind is gone. The Arc and SIEM descriptions below are kept as history.
+
 **Arc**: 3 steps, following the diagram's flow (geometry unchanged from `src/data.ts`).
 1. The three agent boxes (claude code, claude code, run) and the "agents" caption light up.
 2. The edges into wsh and from wsh into arc light with moving packets; wsh, arc and its runs / initiatives / notes boxes light up.

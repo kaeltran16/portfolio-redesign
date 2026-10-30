@@ -1,0 +1,105 @@
+---
+// the arc cockpit, drawn after the dev app's own screens: one run on this site's code, from its task graph to the
+// agent at work, its question and its diff. with `scene` each panel and command carries the step it lights in;
+// console.css plays them off the row's data-step, cockpit.css draws arc's own panels
+import type { ArcPanel, Visual } from '../data';
+import ConsoleCommand from './ConsoleCommand.astro';
+import '../styles/console.css';
+import '../styles/cockpit.css';
+
+type Props = { visual: Extract<Visual, { product: 'arc' }>; scene: boolean };
+const { visual, scene } = Astro.props;
+
+const at = (panel: ArcPanel) => (scene ? visual.steps.findIndex(s => s.panel === panel) + 1 : undefined);
+
+// the run's task graph: plan done, two tasks at work in parallel, checks waiting on both
+const nodes = [
+  { x: 24, y: 50, name: 'Plan', state: 'done' },
+  { x: 128, y: 20, name: 'Helper', state: 'work' },
+  { x: 128, y: 80, name: 'Page label', state: 'work' },
+  { x: 236, y: 50, name: 'Checks', state: 'wait' },
+] as const;
+const edges = [
+  'M32 50 C80 50 80 20 120 20',
+  'M32 50 C80 50 80 80 120 80',
+  'M136 20 C184 20 184 50 228 50',
+  'M136 80 C184 80 184 50 228 50',
+];
+const tools = [
+  ['Read', 'src/data.ts'],
+  ['Edited', 'src/lib/reading-time.ts'],
+  ['Ran', 'npx vitest run'],
+] as const;
+// the helper as the agent wrote it, cut off at the pane's edge like the app's diff view
+const code = [
+  'const WORDS_PER_MINUTE = 200;',
+  '',
+  'export const countWords = (text: string) =>',
+  '  text.split(/\\s+/).filter(Boolean).length;',
+  '',
+  'export const readingMinutes = (texts: string[]) => {',
+  '  const words = texts.reduce((n, t) => n + countWords(t), 0);',
+  '  return Math.max(1, Math.ceil(words / WORDS_PER_MINUTE));',
+];
+const rail = [
+  'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  'M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M6 18l2-2M16 8l2-2M12 8a4 4 0 1 0 .01 0',
+  'M6 8h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM12 8V5M9 13v1M15 13v1',
+  'M8 8l-4 4 4 4M16 8l4 4-4 4',
+  'M6 4a2 2 0 1 0 .01 0M18 16a2 2 0 1 0 .01 0M6 6v12M18 16V9a3 3 0 0 0-3-3H9',
+];
+---
+
+<div class="console arc" role="img" aria-label={visual.label}>
+  <div class="db">
+    <div class="db-bar">
+      <span class="arc-logo"><i></i></span>
+      <b>Arc</b><span class="db-mute">/ All projects</span>
+      <span class="db-space"></span>
+      <span class="db-search"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>Search, or type a goal…</span>
+      <span class="db-chip">5h <span class="arc-meter"><i></i></span> 41%</span>
+      <span class="arc-new">+ New agent</span>
+    </div>
+    <div class="arc-main">
+      <nav class="arc-rail">
+        {rail.map((d, i) => <span data-active={i === 0 ? '' : undefined}><svg viewBox="0 0 24 24"><path d={d} /></svg></span>)}
+      </nav>
+      <div class="db-grid">
+        <section class="p" data-at={at('run')}>
+          <header><svg viewBox="0 0 24 24"><path d="M6 4a2 2 0 1 0 .01 0M6 16a2 2 0 1 0 .01 0M18 10a2 2 0 1 0 .01 0M6 6v10M8 5c6 0 8 2 8 5M8 17c6 0 8-2 8-5" /></svg>Run<span class="p-meta mono">portfolio · 4 tasks</span></header>
+          <svg class="arc-graph" viewBox="0 0 276 104">
+            {edges.map((d, k) => <path class="m-draw" pathLength="100" d={d} style={`animation-delay: ${k * 0.15}s`} />)}
+            {nodes.map(({ x, y, state }) => <circle cx={x} cy={y} r="7" class={`arc-node arc-${state}`} />)}
+            {nodes.map(({ x, y, name }) => <text x={x} y={y + 21} text-anchor="middle">{name}</text>)}
+          </svg>
+          <div class="p-chips arc-counts"><span class="arc-count arc-done-text">1 done</span><span class="arc-count arc-work-text">2 working</span><span class="arc-count">1 waiting</span></div>
+        </section>
+        <section class="p" data-at={at('worker')}>
+          <header><i class="arc-dot arc-pulse"></i><span class="arc-claude">✻</span>reading-time<span class="p-meta mono arc-tag">portfolio</span></header>
+          <p class="arc-say m-fade">Counting words across the sections at 200 a minute.</p>
+          <div class="arc-tools">
+            {tools.map(([verb, target], k) => (
+              <div class="m-fade" style={`animation-delay: ${0.2 + k * 0.2}s`}><span class="arc-tick">✓</span><span class="arc-verb mono">{verb}</span><span class="mono">{target}</span></div>
+            ))}
+          </div>
+        </section>
+        <section class="p arc-asking" data-at={at('ask')}>
+          <header><i class="arc-dot"></i><span class="arc-claude">✻</span>reading-time<span class="p-meta mono arc-tag">portfolio</span></header>
+          <div class="arc-band mono">Waiting on you <span>1m</span></div>
+          <p class="arc-question">Which label format should the reading time use?</p>
+          <div class="arc-option m-fade" data-picked><span class="mono">1</span>4 min read<span class="arc-rec">recommended</span></div>
+          <div class="arc-option m-fade" style="animation-delay: .15s"><span class="mono">2</span>Reading time: 4 minutes</div>
+        </section>
+        <section class="p" data-at={at('diff')}>
+          <header><svg viewBox="0 0 24 24"><path d="M6 4a2 2 0 1 0 .01 0M18 16a2 2 0 1 0 .01 0M6 6v12M18 16V9a3 3 0 0 0-3-3H9" /></svg><span class="mono">src/lib/reading-time.ts</span><span class="p-meta mono"><span class="arc-add">+8</span> <span class="arc-del">−0</span></span></header>
+          <div class="arc-code mono">
+            {code.map((line, k) => (
+              <div class="m-fade" style={`animation-delay: ${k * 0.06}s`}><span class="arc-ln">{k + 1}</span><span class="arc-plus">+</span><span>{line}</span></div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  {scene && <ConsoleCommand steps={visual.steps} />}
+</div>

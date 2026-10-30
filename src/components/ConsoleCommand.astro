@@ -1,0 +1,14 @@
+---
+// the box under a product console that types each step's command; console.css shows only the current one
+type Props = { steps: { verb: string; query: string }[] };
+const { steps } = Astro.props;
+---
+
+<div class="cmd">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 7 5 5-5 5M13 17h6" /></svg>
+  {steps.map(({ verb, query }, i) => (
+    <span class="cmd-line" data-at={i + 1}>
+      <span class="cmd-verb">{verb}</span><span class="cmd-q" style={`--chars: ${[...query].length}`}>{query}</span><i class="cmd-caret"></i>
+    </span>
+  ))}
+</div>

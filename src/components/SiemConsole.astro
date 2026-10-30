@@ -2,13 +2,14 @@
 // the siem console, drawn after the hero of the product's website (apps/website HeroConsole.astro in the siem repo):
 // the ACME demo tenant, its data the one invented attack the steps tell. with `scene` each panel and command carries
 // the step it lights in; console.css plays them off the row's data-step
-import type { ConsolePanel, Visual } from '../data';
+import type { SiemPanel, Visual } from '../data';
+import ConsoleCommand from './ConsoleCommand.astro';
 import '../styles/console.css';
 
-type Props = { visual: Extract<Visual, { kind: 'console' }>; scene: boolean };
+type Props = { visual: Extract<Visual, { product: 'siem' }>; scene: boolean };
 const { visual, scene } = Astro.props;
 
-const at = (panel: ConsolePanel) => (scene ? visual.steps.findIndex(s => s.panel === panel) + 1 : undefined);
+const at = (panel: SiemPanel) => (scene ? visual.steps.findIndex(s => s.panel === panel) + 1 : undefined);
 
 // events over 24 hours in half-hour bars: quiet at night, one red bar in the small hours (the probes)
 const HOT_BAR = 7;
@@ -88,14 +89,5 @@ const chainSteps = ['Night probes', 'Failed logins', 'j.doe login', 'VPN break-i
       </section>
     </div>
   </div>
-  {scene && (
-    <div class="cmd">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 7 5 5-5 5M13 17h6" /></svg>
-      {visual.steps.map(({ verb, query }, i) => (
-        <span class="cmd-line" data-at={i + 1}>
-          <span class="cmd-verb">{verb}</span><span class="cmd-q" style={`--chars: ${[...query].length}`}>{query}</span><i class="cmd-caret"></i>
-        </span>
-      ))}
-    </div>
-  )}
+  {scene && <ConsoleCommand steps={visual.steps} />}
 </div>

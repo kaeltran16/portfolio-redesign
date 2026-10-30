@@ -1,8 +1,7 @@
-/* scroll scenes on home: the arc row plays its diagram in steps, the siem row its console (console.css). page.ts
-   writes the step on the row (data-step); a row without one is in static mode, for no js and reduced motion:
-   everything lit, captions listed. each element's step is its data-at. css cannot name a selector, so two lists
-   repeat below: ahead of the step, :is([data-step='1'] :is([data-at='2'], ...), ...), written out to the
-   diagrams' 4 steps, and current, :is([data-step='1'] [data-at='1'], ...), written out to the console's 6 */
+/* scroll scenes on home: the arc and siem rows play their product consoles (console.css) in steps. page.ts writes
+   the step on the row (data-step); a row without one is in static mode, for no js and reduced motion: everything
+   lit, captions listed. each element's step is its data-at. css cannot name a selector, so the current-step list,
+   :is([data-step='1'] [data-at='1'], ...), is written out to 6 steps */
 
 .scene {
   grid-area: visual;
@@ -42,35 +41,6 @@
       grid-area: auto;
     }
   }
-}
-
-/* --- diagram ---------------------------------------------------------------------------------- */
-
-.diagram-body,
-.diagram [data-at] {
-  transition:
-    opacity var(--durationM) var(--bezierFastoutSlowin),
-    transform var(--durationM) var(--bezierFastoutSlowin);
-}
-
-/* not reached yet: faint rather than hidden, so the whole shape shows from the first step */
-:is(.diagram-edges, .diagram-boxes, .diagram-labels)
-  > :is(
-    [data-step='1'] :is([data-at='2'], [data-at='3'], [data-at='4']),
-    [data-step='2'] :is([data-at='3'], [data-at='4']),
-    [data-step='3'] [data-at='4']
-  ) {
-  opacity: 0.12;
-}
-
-/* packets run on every reached edge */
-.diagram-packets
-  > :is(
-    [data-step='1'] :is([data-at='2'], [data-at='3'], [data-at='4']),
-    [data-step='2'] :is([data-at='3'], [data-at='4']),
-    [data-step='3'] [data-at='4']
-  ) {
-  opacity: 0;
 }
 
 /* --- captions --------------------------------------------------------------------------------- */

@@ -24,26 +24,15 @@ export const social = [
   },
 ];
 
-// diagrams are drawn in a 680x520 viewBox, the same box every visual sits in.
-// `at` is the scroll step an element lights up in, counted from 1; there is one caption per step
-type Label = { x: number; y: number; text: string; tone?: 'primary' | 'caption'; at: number };
+// a drawing of a product's screen in the 680-wide box every visual sits in: one panel lights per scroll step while
+// its command types in the box below. a step's panel is the one it lights, counted from 1; one caption per step
+type ConsoleStep<Panel> = { panel: Panel; verb: string; query: string; caption: string };
+export type SiemPanel = 'agent' | 'risk' | 'intel' | 'chain' | 'alerts' | 'events';
+export type ArcPanel = 'run' | 'worker' | 'ask' | 'diff';
 export type Visual =
-  | {
-      kind: 'diagram';
-      label: string;
-      edges: { d: string; at: number }[];
-      boxes: { rect: [number, number, number, number]; at: number }[];
-      labels: Label[];
-      captions: string[];
-    }
-  // a drawing of a product dashboard: one panel lights per step while its command types in the box below
-  | {
-      kind: 'console';
-      label: string;
-      steps: { panel: ConsolePanel; verb: string; query: string; caption: string }[];
-    }
+  | { kind: 'console'; product: 'siem'; label: string; steps: ConsoleStep<SiemPanel>[] }
+  | { kind: 'console'; product: 'arc'; label: string; steps: ConsoleStep<ArcPanel>[] }
   | { kind: 'phone'; image: ImageMetadata; alt: string };
-export type ConsolePanel = 'agent' | 'risk' | 'intel' | 'chain' | 'alerts' | 'events';
 type Project = {
   slug: string;
   title: string;
@@ -59,42 +48,15 @@ export const projects: Project[] = [
     title: 'Arc',
     description: 'A cockpit for Claude Code. Start and watch agent runs, track multi-week initiatives, and review designs beside the terminal.',
     visual: {
-      kind: 'diagram',
-      label: 'Arc: agent tabs and runs call wsh, which records runs, initiatives and notes in Arc, shown in the cockpit',
-      edges: [
-        { d: 'M130 84 C130 112 340 112 340 140', at: 2 },
-        { d: 'M340 84 L340 140', at: 2 },
-        { d: 'M550 84 C550 112 340 112 340 140', at: 2 },
-        { d: 'M340 184 L340 240', at: 2 },
-        { d: 'M340 370 L340 436', at: 3 },
-      ],
-      boxes: [
-        { rect: [40, 40, 180, 44], at: 1 },
-        { rect: [250, 40, 180, 44], at: 1 },
-        { rect: [460, 40, 180, 44], at: 1 },
-        { rect: [280, 140, 120, 44], at: 2 },
-        { rect: [120, 240, 440, 130], at: 2 },
-        { rect: [138, 300, 124, 44], at: 2 },
-        { rect: [278, 300, 124, 44], at: 2 },
-        { rect: [418, 300, 124, 44], at: 2 },
-        { rect: [280, 436, 120, 44], at: 3 },
-      ],
-      labels: [
-        { x: 40, y: 24, text: 'agents', tone: 'caption', at: 1 },
-        { x: 130, y: 62, text: 'claude code', at: 1 },
-        { x: 340, y: 62, text: 'claude code', at: 1 },
-        { x: 550, y: 62, text: 'run', at: 1 },
-        { x: 340, y: 162, text: 'wsh', at: 2 },
-        { x: 340, y: 270, text: 'arc', tone: 'primary', at: 2 },
-        { x: 200, y: 322, text: 'runs', at: 2 },
-        { x: 340, y: 322, text: 'initiatives', at: 2 },
-        { x: 480, y: 322, text: 'notes', at: 2 },
-        { x: 340, y: 458, text: 'cockpit', at: 3 },
-      ],
-      captions: [
-        'Agents run in their own terminals: Claude Code sessions and orchestrated runs.',
-        'Each one reports through wsh, and Arc records it as runs, initiatives and notes.',
-        'The cockpit shows all of it beside the terminal.',
+      kind: 'console',
+      product: 'arc',
+      label: 'Arc: the cockpit, with a run’s task graph, an agent at work, its question and its change in a diff',
+      // one run told in order, on this site's own code; drawn after the dev app's cockpit
+      steps: [
+        { panel: 'run', verb: 'Run', query: 'Reading time on case pages', caption: 'A run starts from a goal. The engine plans it into tasks and hands each ready one to its own agent.' },
+        { panel: 'worker', verb: 'Watch', query: 'reading-time', caption: 'Each agent works in its own terminal, and its card shows what it read, ran and changed.' },
+        { panel: 'ask', verb: 'Answer', query: '4 min read', caption: 'A decision it should not make alone comes back as a card, answered in place.' },
+        { panel: 'diff', verb: 'Review', query: 'src/lib/reading-time.ts', caption: 'Its change opens in a diff and lands only after review and the run’s checks.' },
       ],
     },
     facts: [
@@ -138,6 +100,7 @@ export const projects: Project[] = [
     description: 'A multi-tenant security platform at MozoX that collects logs from many vendors, detects threats and explains them to analysts.',
     visual: {
       kind: 'console',
+      product: 'siem',
       label: 'SIEM: one console dashboard with a panel per stage, from events arriving to the AI assistant explaining the alert',
       // one attack told in order. it is invented: a documentation-range ip and a reserved domain, not customer data
       steps: [

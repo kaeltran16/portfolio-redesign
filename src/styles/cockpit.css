@@ -1,0 +1,345 @@
+/* the arc cockpit (ArcCockpit.astro): console.css draws the frame, lights the step's panel and types its command;
+   this file is arc's palette, taken from the dev app's screens, its nav rail and its four panels. like the siem
+   console it keeps its dark palette in both themes and scales with --px */
+
+.console.arc {
+  --bg: #0b0d10;
+  --bg-2: #0e1014;
+  --surface: #13161b;
+  --line: rgb(255 255 255 / 0.07);
+  --line-2: rgb(255 255 255 / 0.14);
+  --text: #e8ebf0;
+  --text-2: #c3c9d3;
+  --muted: #8a919d;
+  --accent-rgb: 77 163 255;
+  --ice: rgb(140 195 255);
+  --danger: #f2626f;
+  --warn: #e5b04a;
+  --ok: #3fb950;
+  --claude: #d97757;
+
+  .db-grid {
+    flex: 1;
+    grid-template-rows: repeat(2, calc(186 * var(--px)));
+    grid-auto-flow: row;
+  }
+
+  .db-search {
+    width: calc(190 * var(--px));
+  }
+}
+
+/* --- bar and rail ----------------------------------------------------------------------------- */
+
+.arc-logo {
+  display: grid;
+  place-items: center;
+  width: calc(16 * var(--px));
+  height: calc(16 * var(--px));
+  border-radius: calc(4 * var(--px));
+  background: var(--accent);
+
+  i {
+    width: calc(6 * var(--px));
+    height: calc(6 * var(--px));
+    border-radius: 50%;
+    background: var(--bg);
+  }
+}
+
+.arc-meter {
+  display: inline-block;
+  width: calc(34 * var(--px));
+  height: calc(3 * var(--px));
+  margin: 0 calc(4 * var(--px));
+  vertical-align: middle;
+  border-radius: calc(2 * var(--px));
+  background: rgb(255 255 255 / 0.12);
+
+  i {
+    display: block;
+    width: 41%;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+  }
+}
+
+.arc-new {
+  padding: calc(4 * var(--px)) calc(10 * var(--px));
+  border-radius: calc(5 * var(--px));
+  background: var(--accent);
+  color: #06101e;
+  font-size: calc(11 * var(--px));
+  font-weight: 600;
+}
+
+.arc-main {
+  display: flex;
+}
+
+.arc-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(8 * var(--px));
+  width: calc(44 * var(--px));
+  padding-top: calc(12 * var(--px));
+  border-right: 1px solid var(--line);
+  background: var(--bg);
+
+  span {
+    display: grid;
+    place-items: center;
+    width: calc(30 * var(--px));
+    height: calc(30 * var(--px));
+    border-radius: calc(6 * var(--px));
+  }
+
+  [data-active] {
+    background: rgb(var(--accent-rgb) / 0.14);
+  }
+
+  svg {
+    width: calc(15 * var(--px));
+    height: calc(15 * var(--px));
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  [data-active] svg {
+    stroke: var(--accent);
+  }
+}
+
+/* --- panels ----------------------------------------------------------------------------------- */
+
+.arc-tag {
+  flex: none;
+  padding: 0 calc(6 * var(--px));
+  border: 1px solid var(--line-2);
+  border-radius: calc(3 * var(--px));
+}
+
+.arc-dot {
+  flex: none;
+  width: calc(7 * var(--px));
+  height: calc(7 * var(--px));
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.arc-asking .arc-dot {
+  background: var(--warn);
+}
+
+.arc-pulse {
+  animation: console-pulse 1.4s ease-in-out infinite;
+}
+
+.arc-claude {
+  color: var(--claude);
+  font-size: calc(13 * var(--px));
+}
+
+.arc-graph {
+  width: 100%;
+  height: calc(104 * var(--px));
+  overflow: visible;
+
+  path {
+    fill: none;
+    stroke: rgb(255 255 255 / 0.22);
+    stroke-width: 1.5;
+  }
+
+  text {
+    fill: var(--text-2);
+    font-size: 10.5px;
+  }
+}
+
+.arc-node {
+  fill: var(--surface);
+  stroke-width: 2;
+}
+
+.arc-done {
+  fill: var(--ok);
+  stroke: var(--ok);
+}
+
+.arc-work {
+  stroke: var(--accent);
+}
+
+.arc-wait {
+  stroke: var(--muted);
+}
+
+.arc-count {
+  padding: calc(1 * var(--px)) calc(6 * var(--px));
+  border-radius: calc(3 * var(--px));
+  background: rgb(255 255 255 / 0.06);
+}
+
+.arc-done-text {
+  color: var(--ok);
+}
+
+.arc-work-text {
+  color: var(--ice);
+}
+
+.arc-say {
+  margin: 0;
+  color: var(--text-2);
+}
+
+.arc-tools {
+  display: grid;
+  gap: calc(6 * var(--px));
+  font-size: calc(10.5 * var(--px));
+
+  > div {
+    display: grid;
+    grid-template-columns: calc(12 * var(--px)) calc(46 * var(--px)) minmax(0, 1fr);
+    align-items: center;
+    gap: calc(6 * var(--px));
+  }
+
+  .mono:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.arc-tick {
+  color: var(--ok);
+}
+
+.arc-verb {
+  color: var(--muted);
+  font-size: calc(9.5 * var(--px));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* the app's amber band runs the card's full width */
+.arc-band {
+  margin: 0 calc(-12 * var(--px));
+  padding: calc(4 * var(--px)) calc(12 * var(--px));
+  background: var(--warn);
+  color: #1a1306;
+  font-size: calc(9.5 * var(--px));
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+
+  span {
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+}
+
+.arc-question {
+  margin: 0;
+  font-weight: 600;
+}
+
+.arc-option {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--px));
+  padding: calc(4 * var(--px)) calc(8 * var(--px));
+  border: 1px solid var(--line-2);
+  border-radius: calc(4 * var(--px));
+  white-space: nowrap;
+
+  .mono {
+    color: var(--muted);
+  }
+
+  &[data-picked] {
+    border-color: rgb(229 176 74 / 0.75);
+  }
+}
+
+.arc-rec {
+  padding: 0 calc(5 * var(--px));
+  border: 1px solid rgb(229 176 74 / 0.6);
+  border-radius: calc(3 * var(--px));
+  color: var(--warn);
+  font-size: calc(9.5 * var(--px));
+}
+
+.arc-add {
+  color: var(--ok);
+}
+
+.arc-del {
+  color: var(--danger);
+}
+
+/* the diff view cuts long lines at the pane's edge rather than wrapping them */
+.arc-code {
+  display: grid;
+  overflow: hidden;
+  margin: 0 calc(-12 * var(--px));
+  font-size: calc(10 * var(--px));
+  line-height: 1.55;
+
+  > div {
+    display: grid;
+    grid-template-columns: calc(26 * var(--px)) calc(12 * var(--px)) minmax(0, 1fr);
+    background: rgb(63 185 80 / 0.12);
+    white-space: pre;
+  }
+
+  span:last-child {
+    overflow: hidden;
+  }
+}
+
+.arc-ln {
+  padding-right: calc(6 * var(--px));
+  color: var(--muted);
+  text-align: right;
+}
+
+.arc-plus {
+  color: var(--ok);
+}
+
+/* --- narrow: console.css shows one panel at full size, at siem's panel height so the console fits the box; the rail
+   and each panel's secondary lines go ---------------------------------------------------------- */
+
+@container (width < 560px) {
+  .console.arc .db-grid {
+    grid-template-rows: none;
+    grid-auto-rows: 120px;
+  }
+
+  .arc-graph {
+    height: 75px;
+  }
+
+  :is(.arc-rail, .arc-counts, .arc-say, .arc-asking header) {
+    display: none;
+  }
+
+  .arc-asking {
+    gap: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arc-pulse {
+    animation: none;
+  }
+}

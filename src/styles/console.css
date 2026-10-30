@@ -1,5 +1,6 @@
-/* the siem console (SiemConsole.astro), drawn in the product's own dark palette in both themes, like a screenshot.
-   it is laid out at 680 design px, the box's width, and --px scales it down with the box as the svg diagrams do;
+/* the product consoles (SiemConsole.astro, ArcCockpit.astro), each in its product's own dark palette in both themes,
+   like a screenshot; this file is the shared frame and siem's panels, cockpit.css arc's.
+   it is laid out at 680 design px, the box's width, and --px scales it down with the box;
    below 560px it would be too small to read, so it keeps its size and shows one column instead.
    on a row with data-step only the current panel is lit and its marks play, and the command box types that
    step's request; with no step (no js, reduced motion, the case pages) every panel is lit and there is no box.
