@@ -66,7 +66,8 @@ describe('canPin', () => {
   it.each([
     [1440, 900, 700, true],
     [1039, 900, 700, false],
-    [1040, 900, 900, true],
+    [1040, 900, 900, false],
+    [1041, 900, 900, true],
     [1440, 600, 700, false],
   ])('width %s, height %s, content %s is %s', (width, height, content, expected) => {
     expect(canPin(width, height, content)).toBe(expected);

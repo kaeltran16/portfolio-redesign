@@ -1,6 +1,7 @@
 // scroll-to-step math for the home scenes and the experience timeline; no dom, so it is unit tested
 
-export const PIN_MIN_WIDTH = 1040;
+// global.css stacks rows at max-width: 1040px, so pinning starts just above it
+export const STACK_MAX_WIDTH = 1040;
 // unpinned scenes play while the visual's centre moves from 80% to 20% of the viewport height
 export const REVEAL_START = 0.8;
 export const REVEAL_END = 0.2;
@@ -32,5 +33,5 @@ export function fillFraction(top: number, height: number, line: number): number 
 }
 
 export function canPin(width: number, height: number, content: number): boolean {
-  return width >= PIN_MIN_WIDTH && content <= height;
+  return width > STACK_MAX_WIDTH && content <= height;
 }

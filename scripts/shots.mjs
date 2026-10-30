@@ -358,6 +358,38 @@ const SCENARIOS = [
     step: 'arc row pinned at step 2, then the window made 480 tall: the row drops its pin and its tall track at once',
   },
   {
+    name: 'scenes-1040',
+    viewport: { ...desktop, width: 1040 },
+    waitMs: 1000,
+    eval: `(async () => {
+      await document.fonts.ready;
+      const box = document.querySelector('${row(ARC)} .project-visual').getBoundingClientRect();
+      window.scrollBy({ top: box.top + box.height / 2 - innerHeight / 2, behavior: 'instant' });
+      await ${frames};
+    })()`,
+    check: `(() => {
+      ${scrollKit}
+      const errors = [];
+      for (const [i, r] of sceneRows.entries()) if (r.hasAttribute('data-pinned')) errors.push('row ' + (i + 1) + ' is pinned');
+      if (stickies().length) errors.push(stickies().length + ' elements are sticky');
+      const row = document.querySelector('${row(ARC)}');
+      const text = row.querySelector('.project-text').getBoundingClientRect();
+      const scene = row.querySelector('.scene').getBoundingClientRect();
+      if (scene.top < text.bottom - 0.5 && text.top < scene.bottom - 0.5) errors.push('arc text and scene sit side by side');
+      if (!row.dataset.step) errors.push('arc row has no step');
+      return errors.join('; ');
+    })()`,
+    step: 'a 1040px window, where the rows stack: arc row centred, no row pinned, nothing sticky, text and scene stacked, the row still steps',
+  },
+  {
+    name: 'scenes-1041',
+    viewport: { ...desktop, width: 1041, height: 1000 },
+    waitMs: 1000,
+    eval: toStep(ARC, 2),
+    check: allOf(pinned(ARC), `document.querySelector('${row(ARC)}').dataset.step === '2' ? '' : 'arc row is not at step 2'`),
+    step: 'a 1041x1000 window, just above the stacking width: arc scrolled to step 2 is pinned with its text sticky',
+  },
+  {
     name: 'scenes-focus',
     viewport: desktop,
     waitMs: 1000,
