@@ -1,0 +1,176 @@
+/* scroll scenes on home: the arc and siem rows play their diagram in steps. page.ts writes the step on the row
+   (data-step); a row without one is in static mode, for no js and reduced motion: everything lit, captions listed.
+   each element's step is its data-at. css cannot name a selector, so two lists repeat below, written out to
+   4 steps: ahead of the step, :is([data-step='1'] :is([data-at='2'], ...), ...), and current,
+   :is([data-step='1'] [data-at='1'], ...) */
+
+.scene {
+  grid-area: visual;
+  justify-self: center;
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  margin: 0;
+  container: scene / inline-size;
+}
+
+/* --- diagram ---------------------------------------------------------------------------------- */
+
+.diagram-body,
+.diagram [data-at] {
+  transition:
+    opacity var(--durationM) var(--bezierFastoutSlowin),
+    transform var(--durationM) var(--bezierFastoutSlowin);
+}
+
+/* not reached yet: faint rather than hidden, so the whole shape shows from the first step */
+:is(.diagram-edges, .diagram-boxes, .diagram-labels)
+  > :is(
+    [data-step='1'] :is([data-at='2'], [data-at='3'], [data-at='4']),
+    [data-step='2'] :is([data-at='3'], [data-at='4']),
+    [data-step='3'] [data-at='4']
+  ) {
+  opacity: 0.12;
+}
+
+/* packets run on every reached edge */
+.diagram-packets
+  > :is(
+    [data-step='1'] :is([data-at='2'], [data-at='3'], [data-at='4']),
+    [data-step='2'] :is([data-at='3'], [data-at='4']),
+    [data-step='3'] [data-at='4']
+  ) {
+  opacity: 0;
+}
+
+/* or, for siem, only on the edge into the lit stage */
+.project[data-step] [data-packets='current'] .diagram-packets > [data-at] {
+  opacity: 0;
+
+  &:is([data-step='1'] [data-at='1'], [data-step='2'] [data-at='2'], [data-step='3'] [data-at='3'], [data-step='4'] [data-at='4']) {
+    opacity: 1;
+  }
+}
+
+/* joins the lit stage to its card; only drawn when the card sits beside the diagram */
+.scene-tick {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  opacity: 0;
+}
+
+/* --- siem card -------------------------------------------------------------------------------- */
+
+.scene-card {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+  margin-top: var(--spaceM);
+  padding: 12px 14px;
+  border: 1px solid color-mix(in lab, var(--accent) 50%, transparent);
+  background: color-mix(in lab, var(--text) 3%, var(--background));
+  font-family: var(--monoFontStack);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--textBody);
+
+  > span {
+    white-space: pre-wrap;
+  }
+}
+
+.scene-card-title {
+  color: var(--textLight);
+}
+
+/* narrow: the current card in flow under the box, so it never covers the row's text */
+.project[data-step] .scene-card:is([data-step='1'] [data-at='1'], [data-step='2'] [data-at='2'], [data-step='3'] [data-at='3'], [data-step='4'] [data-at='4']) {
+  display: flex;
+  animation: fade-in var(--durationM) var(--bezierFastoutSlowin);
+}
+
+/* wide enough that the card's longest line (30 mono characters) fits beside the diagram without wrapping */
+@container scene (width >= 648px) {
+  /* the diagram column moves left in the box to make room: box x 200 to 100, in viewBox units */
+  .project[data-step] .scene:has(.scene-card) .diagram-body {
+    transform: translateX(-100px);
+  }
+
+  .project[data-step] .scene-tick:is([data-step='1'] [data-at='1'], [data-step='2'] [data-at='2'], [data-step='3'] [data-at='3'], [data-step='4'] [data-at='4']) {
+    opacity: 1;
+  }
+
+  /* every card stays laid out beside its stage so the current one can fade in where it sits */
+  .project[data-step] .scene-card {
+    display: flex;
+    position: absolute;
+    left: 61%;
+    width: 38%;
+    top: calc(100cqw * var(--y) / 680);
+    margin: 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(calc(-50% + var(--spaceS)));
+    transition:
+      opacity var(--durationM) var(--bezierFastoutSlowin),
+      transform var(--durationM) var(--bezierFastoutSlowin),
+      visibility var(--durationM);
+
+    &:is([data-step='1'] [data-at='1'], [data-step='2'] [data-at='2'], [data-step='3'] [data-at='3'], [data-step='4'] [data-at='4']) {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(-50%);
+      animation: none;
+    }
+  }
+}
+
+/* --- captions --------------------------------------------------------------------------------- */
+
+.scene-captions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spaceS);
+  margin: var(--spaceL) 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spaceM);
+    font-size: var(--fontSizeBodyS);
+    line-height: 1.5;
+    color: var(--textBody);
+  }
+}
+
+/* the board's counter is accent; --primary is accent in dark and black in light, where accent is under 4.5:1 */
+.scene-count {
+  font-family: var(--monoFontStack);
+  font-size: 13px;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+/* in a step only the current caption shows; the rest stay readable to screen readers, as .visually-hidden */
+.project[data-step] .scene-captions li {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+
+  &:is([data-step='1'] [data-at='1'], [data-step='2'] [data-at='2'], [data-step='3'] [data-at='3'], [data-step='4'] [data-at='4']) {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    animation: fade-in var(--durationM) var(--bezierFastoutSlowin);
+  }
+}
