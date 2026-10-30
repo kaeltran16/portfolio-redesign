@@ -1,4 +1,4 @@
-// shared by Home and the case-study pages. bracketed text is a placeholder until khang supplies the real copy and media.
+// shared by Home and the case-study pages. case-study copy is a draft until khang finalizes it.
 import type { ImageMetadata } from 'astro';
 import opalToday from './assets/opal-today.png';
 
@@ -90,18 +90,35 @@ export const projects: Project[] = [
           'It wraps existing agent CLIs (Claude Code or pi) rather than replacing them. It began as a fork of Wave Terminal; I moved the desktop shell from Electron to Tauri.',
         ],
       },
-      { heading: 'Why I built it', body: ['[The problem running several agents at once created, in your words]'] },
-      { heading: 'How it works', body: ['[Runs, the orchestrator DAG, worktree isolation and review gates: the two or three design calls worth explaining]'] },
-      { heading: 'What I learned', body: ['[What changed in how you work, or what you would do differently]'] },
+      {
+        heading: 'Why I built it',
+        body: [
+          'Running more agents did not mean less work. It meant a different kind: knowing which agent was waiting on a decision, which task was blocked on another, what actually landed and whether anyone checked it. That context lived in a dozen terminal tabs and transcripts.',
+          'Arc puts it next to the work. Questions and review requests surface in one place instead of disappearing into scrollback, and a run’s changes open in a diff view in the same window.',
+        ],
+      },
+      {
+        heading: 'How it works',
+        body: [
+          'The main design call is a hard line between code and model. A deterministic engine owns scheduling, worktrees, merges and command execution. Agents do implementation and judgment. Anything they cannot safely decide comes to me.',
+          'A planned run starts with a review of the plan itself: requirements, dependencies, file ownership, how each task will be verified. The engine then dispatches dependency-ready tasks into isolated git worktrees, reviews each change, merges the lanes into the run’s own branch and runs the checks before anything lands.',
+        ],
+      },
+      {
+        heading: 'What I learned',
+        body: [
+          'The useful question with agents is not what a model can do, but what it should never be asked to do. Once retries, merges and routing moved into plain code, runs became repeatable and failures became something I could read instead of something I had to reproduce.',
+        ],
+      },
     ],
   },
   {
     slug: 'siem',
     title: 'SIEM',
-    description: '[SIEM: one line on what the platform does and who uses it]',
+    description: 'A multi-tenant security platform at MozoX that collects logs from many vendors, detects threats and explains them to analysts.',
     visual: {
       kind: 'diagram',
-      label: 'SIEM, a draft: [log sources] flow through [collectors and parsers] into [detection and ai], shown in [management panel]',
+      label: 'SIEM: log sources flow through collectors and parsers into detection and AI, shown in the management panel',
       edges: ['M340 84 L340 172', 'M340 216 L340 304', 'M340 348 L340 436'],
       boxes: [
         [200, 40, 280, 44],
@@ -110,30 +127,45 @@ export const projects: Project[] = [
         [200, 436, 280, 44],
       ],
       labels: [
-        { x: 340, y: 62, text: '[log sources]' },
-        { x: 340, y: 194, text: '[collectors and parsers]' },
-        { x: 340, y: 326, text: '[detection and ai]', tone: 'primary' },
-        { x: 340, y: 458, text: '[management panel]' },
+        { x: 340, y: 62, text: 'log sources' },
+        { x: 340, y: 194, text: 'collectors and parsers' },
+        { x: 340, y: 326, text: 'detection and ai', tone: 'primary' },
+        { x: 340, y: 458, text: 'management panel' },
       ],
     },
     facts: [
-      { label: 'Role', value: '[Your title], [Company]' },
+      { label: 'Role', value: 'Full-stack engineer, MozoX' },
       { label: 'When', value: 'July 2023 – now' },
-      { label: 'Stack', value: '[Languages and infrastructure you are comfortable naming publicly]' },
+      { label: 'Stack', value: 'Next.js and React, Java, Python, PostgreSQL, Elasticsearch' },
     ],
     sections: [
       {
         heading: 'What it is',
-        body: ['[The platform in two sentences, at a level your employer is comfortable with]'],
+        body: [
+          'A security information and event management platform for enterprise customers. It takes logs from sources such as Check Point, F5, CrowdStrike and VMware ESXi, maps them onto one schema and flags the activity worth an analyst’s time, at around a thousand events a second across tenants.',
+        ],
       },
       {
         heading: 'What I worked on',
         body: [
-          '[The management panel, anomaly detection, the AI assistant, parser config generation, log collectors: pick the ones to feature and say what you owned in each]',
+          'The AI log parser: a model maps a new log source onto the platform’s schema, so onboarding a source no longer starts with a hand-written parser.',
+          'Anomaly detection: a correlation engine that combines Isolation Forest, an autoencoder and Z-scores, and maps what it finds to MITRE ATT&CK techniques.',
+          'Analyst-facing AI: natural-language search that turns a question into a query, and generated executive reports in several languages.',
+          'Full-stack work across the management panel, vendor log integrations and MITRE ATT&CK dashboards, plus a modernization effort I started that upgraded the web app without disrupting the live system.',
         ],
       },
-      { heading: 'How it works', body: ['[One design decision worth explaining, without internal details]'] },
-      { heading: 'Outcome', body: ['[What changed for users or the team, ideally with a number you can stand behind]'] },
+      {
+        heading: 'How it works',
+        body: [
+          'The model is used where the input is unpredictable and kept out of the hot path. Mapping an unfamiliar log format is a judgment call, so the model does it once per source; parsing a thousand events a second is not, so that stays deterministic.',
+        ],
+      },
+      {
+        heading: 'Outcome',
+        body: [
+          'Onboarding a new log source went from about a week to minutes, and around a fifth of all log volume now goes through the AI parsing pipeline.',
+        ],
+      },
     ],
   },
   {
@@ -159,9 +191,27 @@ export const projects: Project[] = [
           'A small Cloudflare Worker holds what the phone cannot: the model API key and a little server-side state for the widget, the Health shortcut and Pal’s memory.',
         ],
       },
-      { heading: 'Why I built it', body: ['[What you were tracking in separate apps, and why one app]'] },
-      { heading: 'How it works', body: ['[Local-first storage, the Pal backend, iOS Live Activities and Siri: the calls worth explaining]'] },
-      { heading: 'What I learned', body: ['[What changed in how you work, or what you would do differently]'] },
+      {
+        heading: 'Why I built it',
+        body: [
+          'I tracked spending in one app, workouts in another and habits in a third, and none of them knew about the others. The interesting questions sit between them: whether a rainy day should move leg day, or what a heavy week did to sleep.',
+          'One app with one assistant that can read across all of it was the simplest way to ask those questions.',
+        ],
+      },
+      {
+        heading: 'How it works',
+        body: [
+          'opal is local-first: everything lives on the phone in SQLite through Drift and works offline. The Worker only holds what the phone cannot, so it stays small and the app still runs against a mock backend.',
+          'Live Activities, Siri shortcuts and notifications are native iOS. The app is sideloaded with a free Apple ID, which rules out HealthKit, so health features degrade gracefully without it.',
+          'The design follows Oura’s approach rather than a dashboard: Today leads with the one thing that matters right now, and detail is always one tap away.',
+        ],
+      },
+      {
+        heading: 'What I learned',
+        body: [
+          'Designing for one user, me, made the trade-offs honest. Every feature had to earn a place on a screen I open every morning, and most of the work turned out to be cutting things.',
+        ],
+      },
     ],
   },
 ];

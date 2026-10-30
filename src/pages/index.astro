@@ -36,13 +36,13 @@ const experience = [
 const email = social.find(s => s.href.startsWith('mailto:'))!;
 const elsewhere = social.filter(s => s !== email);
 
-// placeholders until khang writes the real copy
+// draft copy until khang finalizes it
 const about = [
-  '[Who you are and what you work on now, in two or three sentences]',
-  '[How you got here, or what you care about in your work]',
-  '[Something outside work, optional]',
+  'I’m Khang, a full-stack engineer in Ho Chi Minh City. At MozoX I build a multi-tenant security platform, from the React panels analysts use to the Java and Python services behind them, and lately the LLM and ML features in between.',
+  'I like owning a feature end to end, and I care most about the tools other engineers use. Outside work that means side projects like Arc, a cockpit for coding agents, and opal, an app I open every morning.',
+  'If you are hiring, building something in this space, or just want to talk shop, my inbox is open.',
 ];
-const contactPitch = '[One line on what you are open to, e.g. roles, collaborations, a chat about tooling]';
+const contactPitch = 'Open to remote full-stack roles, and always happy to talk about developer tooling.';
 ---
 
 <Base title={`${name} | Full-stack software developer`} description={`${name}, full-stack software developer. I build the tools engineers use.`}>
