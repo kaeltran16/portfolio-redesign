@@ -94,7 +94,8 @@ body {
   background-color: var(--background);
   color: var(--textBody);
   transition: background var(--durationM) ease;
-  overflow-x: hidden;
+  /* clip, not hidden: hidden makes body a scroll container that never scrolls, so the pinned rows could not stick */
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
 }
 

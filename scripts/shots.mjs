@@ -9,6 +9,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { READING_LINE, REVEAL_END, REVEAL_START } from '../src/lib/scene.ts';
 
 const OUT = process.argv[2] ?? process.env.ARC_FINAL_OUT ?? join(tmpdir(), 'portfolio-shots');
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -74,7 +75,12 @@ const projectsFit = `(async () => {
   const size = b => Math.round(b.width) + 'x' + Math.round(b.height);
   if (!rows || boxes.length !== rows) return 'expected one visual per project row, found ' + boxes.length + ' for ' + rows;
   if (new Set(boxes.map(size)).size > 1) return 'project visuals differ: ' + boxes.map(size).join(', ');
-  const wide = [...document.querySelectorAll('#projects *')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5);
+  // content clipped by an ancestor, such as a visually hidden step caption, cannot run past; the ancestor is checked itself
+  const clipped = el => {
+    for (let a = el.parentElement; a.id !== 'projects'; a = a.parentElement) if (/hidden|clip/.test(getComputedStyle(a).overflowX)) return true;
+    return false;
+  };
+  const wide = [...document.querySelectorAll('#projects *')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5 && !clipped(el));
   if (wide) return 'runs past the viewport: ' + wide.tagName + '.' + wide.getAttribute('class');
   const spill = [...document.querySelectorAll('.phone')].find(p => p.scrollWidth > p.clientWidth || p.scrollHeight > p.clientHeight);
   return spill ? 'screenshot spills out of its phone: ' + spill.querySelector('img')?.alt : '';
@@ -93,11 +99,26 @@ const row = n => `#projects .project:nth-of-type(${n})`;
 const ARC = 1;
 const SIEM = 2;
 const OPAL = 3;
-// steps are forced by hand: the row scrolled into view, then its step set
-const atStep = (n, k) => `(() => {
+const frames = 'new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))';
+// scrolls a pinned row to the middle of step k: its top plus (k - 0.5) / steps of its pinned scroll length.
+// fonts first, since the driver re-measures rows when they arrive
+const toStep = (n, k) => `(async () => {
+  await document.fonts.ready;
   const row = document.querySelector('${row(n)}');
-  row.scrollIntoView();
-  row.dataset.step = '${k}';
+  const steps = Number(row.querySelector('.scene').dataset.steps);
+  const { top, height } = row.getBoundingClientRect();
+  window.scrollTo({ top: scrollY + top + (height - innerHeight) * (${k} - 0.5) / steps, behavior: 'instant' });
+  await ${frames};
+})()`;
+// scrolls an unpinned row so its visual's centre sits where the reveal reads the middle of step k
+const toRevealStep = (n, k) => `(async () => {
+  await document.fonts.ready;
+  const row = document.querySelector('${row(n)}');
+  const steps = Number(row.querySelector('.scene').dataset.steps);
+  const { top, height } = row.querySelector('.project-visual').getBoundingClientRect();
+  const centre = (${REVEAL_START} - (${REVEAL_START - REVEAL_END}) * (${k} - 0.5) / steps) * innerHeight;
+  window.scrollBy({ top: top + height / 2 - centre, behavior: 'instant' });
+  await ${frames};
 })()`;
 // page-side helpers: on screen means not hidden, not transparent and not clipped away like .visually-hidden
 const sceneKit = `
@@ -135,6 +156,17 @@ const showsStep = (n, k) => `(() => {
   if (card && !within(card, { left: 0, top: 0, right: innerWidth, bottom: innerHeight })) errors.push('card runs out of the viewport');
   return errors.join('; ');
 })()`;
+// returns an error string unless the row is pinned with its text sticky and its box in the viewport
+const pinned = n => `(() => {
+  ${sceneKit}
+  const row = document.querySelector('${row(n)}');
+  const errors = [];
+  if (!row.hasAttribute('data-pinned')) errors.push('row is not pinned');
+  if (getComputedStyle(row.querySelector('.project-text')).position !== 'sticky') errors.push('row text is not sticky');
+  const box = row.querySelector('.project-visual').getBoundingClientRect();
+  if (!within(box, { left: 0, top: 0, right: innerWidth, bottom: innerHeight })) errors.push('box is not wholly in the viewport');
+  return errors.join('; ');
+})()`;
 const sceneText = n => `.scene-captions li span${n === SIEM ? ', .scene-card span' : ''}`;
 const sceneScenarios = [
   ...[1, 2, 3].map(k => [ARC, 'arc', k, false]),
@@ -145,11 +177,85 @@ const sceneScenarios = [
   name: `scene-${slug}-${k}${light ? '-light' : ''}`,
   viewport: desktop,
   waitMs: 1000,
-  eval: light ? `${toggleTheme}; ${atStep(n, k)}` : atStep(n, k),
-  check: allOf(showsStep(n, k), readable(row(n), sceneText(n))),
-  clip: row(n),
-  step: `${slug} scene at step ${k} of ${slug === 'arc' ? 3 : 4}, ${light ? 'light' : 'dark'}: elements ahead faint, packets on the reached edges${slug === 'siem' ? ' (only the one into the lit stage), the stage’s card and tick beside it' : ''}, only caption ${k} shown, text at 4.5:1 or more`,
+  eval: light ? `${toggleTheme}; ${toStep(n, k)}` : toStep(n, k),
+  check: allOf(pinned(n), showsStep(n, k), readable(row(n), sceneText(n))),
+  step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 3 : 4}, ${light ? 'light' : 'dark'}: row pinned, elements ahead faint, packets on the reached edges${slug === 'siem' ? ' (only the one into the lit stage), the stage’s card and tick beside it' : ''}, only caption ${k} shown, text at 4.5:1 or more`,
 }));
+
+// page-side helpers for the scroll checks
+const scrollKit = `
+  ${sceneKit}
+  const projects = document.getElementById('projects');
+  const sceneRows = [...projects.querySelectorAll('.project')].filter(r => r.querySelector('.scene'));
+  const stickies = () => [...projects.querySelectorAll('*')].filter(el => getComputedStyle(el).position === 'sticky');
+  // natural heights, as the driver measures them: a pinned row's text and scene are a viewport tall
+  const contentOf = r => {
+    const pinned = r.hasAttribute('data-pinned');
+    r.removeAttribute('data-pinned');
+    const height = Math.max(...['.project-text', '.scene'].map(s => r.querySelector(s).getBoundingClientRect().height));
+    r.toggleAttribute('data-pinned', pinned);
+    return height;
+  };
+`;
+// returns an error string if any scene row is pinned, anything sticks, or a row keeps more height than its content
+const unpinned = `(() => {
+  ${scrollKit}
+  const errors = [];
+  for (const [i, r] of sceneRows.entries()) {
+    if (contentOf(r) <= innerHeight) errors.push('row ' + (i + 1) + ' content (' + Math.round(contentOf(r)) + 'px) fits a ' + innerHeight + 'px window, so this does not test a short one');
+    if (r.hasAttribute('data-pinned')) errors.push('row ' + (i + 1) + ' is pinned');
+    const height = r.getBoundingClientRect().height;
+    if (height > Math.max(contentOf(r), parseFloat(getComputedStyle(r).minHeight)) + 1) errors.push('row ' + (i + 1) + ' keeps a tall track of ' + Math.round(height) + 'px');
+  }
+  if (stickies().length) errors.push(stickies().length + ' elements are sticky');
+  return errors.join('; ');
+})()`;
+// a window shorter than the rows' content (arc's is about 507px at 1280 wide); `unpinned` checks that it still is
+const shortWindow = { width: 1280, height: 480, deviceScaleFactor: 1, mobile: false };
+// a tenth of the viewport either side of the timeline's reading line
+const CLEAR = 0.1;
+// page-side helpers for the timeline: accent resolved through a probe, never compared as custom-property text
+const timelineKit = `
+  const probe = document.body.appendChild(document.createElement('i'));
+  probe.style.color = 'var(--accent)';
+  const accent = getComputedStyle(probe).color;
+  probe.remove();
+  const list = document.querySelector('.experience-list');
+  const roles = [...list.querySelectorAll('.experience-role')];
+  const marker = (role, part) => getComputedStyle(role.querySelector('.experience-marker'), part);
+  const filled = role => marker(role, '::before').backgroundColor === accent;
+  const fillOf = role => role.style.getPropertyValue('--fill');
+  // share of the role's segment drawn in accent: the stop after the gradient's accent, or all of a flat accent line
+  const drawn = role => {
+    const line = marker(role, '::after');
+    if (line.backgroundImage === 'none') return line.backgroundColor === accent ? 1 : 0;
+    const [, after] = line.backgroundImage.split(accent + ' ');
+    return after ? parseFloat(after) / 100 : 0;
+  };
+  const trackAfter = role => /(rgb|lab|color)\\(/.test(marker(role, '::after').backgroundImage.split(accent)[1] ?? '');
+  const reading = ${READING_LINE} * innerHeight;
+  const scrollToLine = (y, line) => window.scrollBy({ top: y - line * innerHeight, behavior: 'instant' });
+`;
+// returns an error string naming each role whose reached, fill, marker or segment differs from `want`
+const rolesAre = want => `(() => {
+  ${timelineKit}
+  const want = ${want};
+  const errors = [];
+  roles.forEach((role, i) => {
+    const w = want(i);
+    if (!w) return;
+    const name = 'role ' + (i + 1);
+    if ('reached' in w && role.hasAttribute('data-reached') !== w.reached) errors.push(name + (w.reached ? ' is not' : ' is') + ' reached');
+    if ('fill' in w && fillOf(role) !== w.fill) errors.push(name + ' has --fill ' + fillOf(role) + ', not ' + w.fill);
+    if ('filled' in w && filled(role) !== w.filled) errors.push(name + ' marker is ' + (w.filled ? 'hollow' : 'filled'));
+    const share = drawn(role);
+    if (w.drawn === 'part' ? !(share > 0 && share < 1 && trackAfter(role)) : 'drawn' in w && share !== w.drawn) {
+      errors.push(name + ' segment is ' + Math.round(share * 100) + '% accent, not ' + (w.drawn === 'part' ? 'part accent, part track' : w.drawn * 100 + '%'));
+    }
+  });
+  return errors.join('; ');
+})()`;
+const drawing = on => `document.querySelector('.experience-list').hasAttribute('data-drawing') === ${on} ? '' : 'timeline ${on ? 'does not draw' : 'draws'}'`;
 
 const SCENARIOS = [
   { name: 'desktop', viewport: desktop, waitMs: 7000, check: titleFits },
@@ -181,10 +287,12 @@ const SCENARIOS = [
     name: 'scene-siem-2-phone-390',
     viewport: phone,
     waitMs: 1000,
-    eval: atStep(SIEM, 2),
+    eval: toRevealStep(SIEM, 2),
     check: `(() => {
       ${sceneKit}
       const row = document.querySelector('${row(SIEM)}');
+      if (row.dataset.step !== '2') return 'row is at step ' + row.dataset.step + ', not 2';
+      if (row.hasAttribute('data-pinned')) return 'row is pinned on a phone';
       const cards = [...row.querySelectorAll('.scene-card')].filter(onScreen);
       if (cards.map(at).join() !== '2') return 'cards shown for steps [' + cards.map(at).join(', ') + '], not only 2';
       const card = cards[0].getBoundingClientRect();
@@ -196,20 +304,115 @@ const SCENARIOS = [
       if (caption && card.bottom > caption.top + 0.5) return 'card overlaps the step caption';
       return card.bottom > text.top + 0.5 ? 'card overlaps the row text' : '';
     })()`,
-    clip: row(SIEM),
-    step: 'siem scene at step 2 on a 390px phone: the card sits under the diagram box, inside the width, above the caption and the row text',
+    step: 'siem scene scrolled to step 2 on a 390px phone: not pinned, the card sits under the diagram box, inside the width, above the caption and the row text',
+  },
+  {
+    name: 'scenes-phone-390',
+    viewport: phone,
+    waitMs: 500,
+    check: `(async () => {
+      ${scrollKit}
+      await document.fonts.ready;
+      const errors = new Set();
+      const seen = sceneRows.map(() => new Set());
+      const { top, bottom } = projects.getBoundingClientRect();
+      const start = scrollY + top - innerHeight;
+      // an eighth of the viewport per move is finer than the reveal's 0.6 viewport split into 4 steps
+      for (let y = start; y <= scrollY + bottom; y += innerHeight / 8) {
+        window.scrollTo({ top: y, behavior: 'instant' });
+        await ${frames};
+        for (const el of stickies()) errors.add('.' + el.className + ' is sticky');
+        sceneRows.forEach((r, i) => {
+          const step = Number(r.dataset.step);
+          if (step < Math.max(0, ...seen[i])) errors.add('row ' + (i + 1) + ' went back to step ' + step);
+          seen[i].add(step);
+          const text = r.querySelector('.project-text').getBoundingClientRect();
+          const figure = r.querySelector('.scene').getBoundingClientRect();
+          if (figure.bottom > text.top + 0.5 && figure.top < text.bottom - 0.5) errors.add('row ' + (i + 1) + ' figure overlaps its text');
+        });
+      }
+      sceneRows.forEach((r, i) => {
+        const steps = Number(r.querySelector('.scene').dataset.steps);
+        const all = Array.from({ length: steps }, (_, k) => k + 1).join();
+        if ([...seen[i]].join() !== all) errors.add('row ' + (i + 1) + ' passed steps [' + [...seen[i]].join(', ') + '], not ' + all);
+      });
+      return [...errors].join('; ');
+    })()`,
+    step: 'scrolling down through the projects on a 390px phone: nothing sticky, each scene steps forward through every step, no figure over its text',
+  },
+  {
+    name: 'scenes-short-window',
+    viewport: shortWindow,
+    waitMs: 1000,
+    eval: toStep(ARC, 2),
+    check: unpinned,
+    step: 'a 1280x480 window, shorter than the rows: no row pinned, nothing sticky, no tall track',
+  },
+  {
+    name: 'scenes-short-window-resize',
+    viewport: desktop,
+    eval: `${toStep(ARC, 2)}.then(() => (window.wasPinned = document.querySelector('${row(ARC)}').hasAttribute('data-pinned')))`,
+    resize: shortWindow,
+    waitMs: 1000,
+    check: allOf(`window.wasPinned ? '' : 'arc row was not pinned before the resize'`, unpinned),
+    step: 'arc row pinned at step 2, then the window made 480 tall: the row drops its pin and its tall track at once',
+  },
+  {
+    name: 'scenes-focus',
+    viewport: desktop,
+    waitMs: 1000,
+    eval: `${toStep(ARC, 1)}.then(() => document.querySelector('${row(SIEM)} .button').focus())`,
+    check: `(() => {
+      ${sceneKit}
+      const button = document.querySelector('${row(SIEM)} .button');
+      const box = button.getBoundingClientRect();
+      if (!within(box, { left: 0, top: 0, right: innerWidth, bottom: innerHeight })) return 'focused button is not wholly in the viewport';
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return button.contains(hit) ? '' : 'focused button is covered by ' + hit?.tagName + '.' + hit?.getAttribute('class');
+    })()`,
+    step: 'arc row pinned at step 1, then the siem row’s View project link focused: the link scrolls into view, uncovered',
+  },
+  {
+    name: 'scenes-anchor',
+    viewport: desktop,
+    page: '#experience',
+    waitMs: 1500,
+    check: `(() => {
+      ${scrollKit}
+      ${timelineKit}
+      const errors = [];
+      sceneRows.forEach((r, i) => {
+        const steps = r.querySelector('.scene').dataset.steps;
+        if (r.dataset.step !== steps) errors.push('row ' + (i + 1) + ' is at step ' + r.dataset.step + ', not its last, ' + steps);
+      });
+      const heading = document.querySelector('#experience h2').getBoundingClientRect();
+      if (heading.top < 0 || heading.bottom > innerHeight) errors.push('experience heading is not in the viewport');
+      const behind = roles.filter(role => role.getBoundingClientRect().top < reading && !role.hasAttribute('data-reached'));
+      if (behind.length) errors.push(behind.length + ' roles above the reading line are not reached');
+      return errors.join('; ');
+    })()`,
+    step: 'opened at /#experience: the arc and siem rows above show their last step, the heading is in view, the timeline drawn to the reading line',
   },
   {
     name: 'scenes-reduced-motion',
     viewport: desktop,
     waitMs: 1000,
     reduced: true,
-    eval: show('projects'),
+    eval: `(async () => {
+      const { bottom } = document.getElementById('experience').getBoundingClientRect();
+      for (let y = 0; y <= scrollY + bottom; y += innerHeight / 4) {
+        window.scrollTo({ top: y, behavior: 'instant' });
+        await ${frames};
+      }
+      ${show('projects')};
+    })()`,
     check: allOf(packetsStill, `(() => {
       ${sceneKit}
       const projects = document.getElementById('projects');
       const errors = [];
       if (projects.querySelector('[data-step]')) errors.push('a row has a step under reduced motion');
+      if (projects.querySelector('[data-pinned]')) errors.push('a row is pinned under reduced motion');
+      if (document.querySelector('[data-drawing]')) errors.push('the timeline draws under reduced motion');
       const dim = [...litOf(projects), ...projects.querySelectorAll('.diagram-packets [data-at]')].filter(el => opacityOf(el) !== '1');
       if (dim.length) errors.push(dim.length + ' diagram elements are not fully lit');
       const hidden = [...projects.querySelectorAll('.scene-captions li')].filter(el => !onScreen(el));
@@ -263,6 +466,50 @@ const SCENARIOS = [
     })()`,
     clip: '#experience',
     step: 'experience download cv button focused: focus ring visible',
+  },
+  {
+    name: 'experience-draw-start',
+    viewport: desktop,
+    waitMs: 1000,
+    eval: `(() => { ${timelineKit} scrollToLine(roles[0].getBoundingClientRect().top, ${READING_LINE + CLEAR}); })()`,
+    check: allOf(drawing(true), rolesAre(`() => ({ reached: false, fill: '0', filled: false, drawn: 0 })`)),
+    clip: '#experience',
+    step: 'experience timeline with the reading line above the first role: nothing reached, every marker hollow, no accent line',
+  },
+  {
+    name: 'experience-draw-mid',
+    viewport: desktop,
+    waitMs: 1000,
+    eval: `(() => {
+      ${timelineKit}
+      const { top, height } = roles[0].getBoundingClientRect();
+      scrollToLine(top + height / 2, ${READING_LINE});
+    })()`,
+    check: allOf(drawing(true), rolesAre(`i => [
+      { reached: true, filled: true, drawn: 'part' },
+      { reached: false, fill: '0', filled: false, drawn: 0 },
+    ][i]`)),
+    clip: '#experience',
+    step: 'experience timeline with the reading line inside the first role: its marker filled and its line part drawn, the second role untouched',
+  },
+  {
+    name: 'experience-draw-end',
+    viewport: desktop,
+    waitMs: 1000,
+    eval: `(() => { ${timelineKit} scrollToLine(list.getBoundingClientRect().bottom, ${READING_LINE - CLEAR}); })()`,
+    check: allOf(drawing(true), rolesAre(`() => ({ reached: true, fill: '1', filled: true, drawn: 1 })`)),
+    clip: '#experience',
+    step: 'experience timeline scrolled past the list: every role reached, every marker filled, the whole line accent',
+  },
+  {
+    name: 'experience-reduced-motion',
+    viewport: desktop,
+    waitMs: 1000,
+    reduced: true,
+    eval: showExperience,
+    check: allOf(drawing(false), rolesAre(`() => ({ filled: true, drawn: 1 })`)),
+    clip: '#experience',
+    step: 'experience timeline under reduced motion: not drawing, every marker filled, the whole line accent',
   },
 ];
 // the page-space rect of a selector, for a screenshot of a section taller than the viewport
@@ -345,7 +592,12 @@ try {
     }, sessionId);
     await send('Page.navigate', { url: new URL(s.page ?? '', BASE_URL).href }, sessionId);
     await sleep(800);
-    if (s.eval) await send('Runtime.evaluate', { expression: s.eval }, sessionId);
+    if (s.eval) {
+      const { exceptionDetails } = await send('Runtime.evaluate', { expression: s.eval, awaitPromise: true }, sessionId);
+      if (exceptionDetails) errors.push(`${s.name}: eval threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
+    }
+    // a window resized mid-scenario, after the eval has set up the state before it
+    if (s.resize) await send('Emulation.setDeviceMetricsOverride', s.resize, sessionId);
     await sleep(s.waitMs);
     if (s.check) {
       const { result, exceptionDetails } = await send('Runtime.evaluate', { expression: s.check, returnByValue: true, awaitPromise: true }, sessionId);

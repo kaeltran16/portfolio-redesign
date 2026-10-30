@@ -14,6 +14,36 @@
   container: scene / inline-size;
 }
 
+/* --- pin -------------------------------------------------------------------------------------- */
+
+/* page.ts pins a row only when the window can hold its content. the row itself is the scroll track, so
+   :nth-of-type(even) still alternates; its text and scene hold still for one viewport of scroll per step */
+.project[data-pinned] {
+  min-height: calc((var(--steps) + 1) * 100svh);
+  align-items: start;
+
+  > :is(.project-text, .scene) {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+  }
+
+  > .project-text {
+    justify-content: center;
+  }
+
+  /* a grid rather than flex so the wide siem card can take the box's grid area as its containing block */
+  > .scene {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+
+    > .project-visual {
+      grid-area: auto;
+    }
+  }
+}
+
 /* --- diagram ---------------------------------------------------------------------------------- */
 
 .diagram-body,
@@ -124,6 +154,11 @@
       transform: translateY(-50%);
       animation: none;
     }
+  }
+
+  /* pinned, the box is centred in a tall scene, so the card is placed against the box rather than the scene's top */
+  .project[data-pinned] .scene-card {
+    grid-area: 1 / 1;
   }
 }
 
