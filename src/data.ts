@@ -35,12 +35,15 @@ export type Visual =
       boxes: { rect: [number, number, number, number]; at: number }[];
       labels: Label[];
       captions: string[];
-      // one per step: what the sample event looks like at the lit stage
-      cards?: { title: string; lines: string[] }[];
-      // packets run on every reached edge, or only on the edge into the current step
-      packets?: 'reached' | 'current';
+    }
+  // a drawing of a product dashboard: one panel lights per step while its command types in the box below
+  | {
+      kind: 'console';
+      label: string;
+      steps: { panel: ConsolePanel; verb: string; query: string; caption: string }[];
     }
   | { kind: 'phone'; image: ImageMetadata; alt: string };
+export type ConsolePanel = 'agent' | 'risk' | 'intel' | 'chain' | 'alerts' | 'events';
 type Project = {
   slug: string;
   title: string;
@@ -134,39 +137,17 @@ export const projects: Project[] = [
     title: 'SIEM',
     description: 'A multi-tenant security platform at MozoX that collects logs from many vendors, detects threats and explains them to analysts.',
     visual: {
-      kind: 'diagram',
-      label: 'SIEM: log sources flow through collectors and parsers into detection and AI, shown in the management panel',
-      edges: [
-        { d: 'M340 84 L340 172', at: 2 },
-        { d: 'M340 216 L340 304', at: 3 },
-        { d: 'M340 348 L340 436', at: 4 },
+      kind: 'console',
+      label: 'SIEM: one console dashboard with a panel per stage, from events arriving to the AI assistant explaining the alert',
+      // one attack told in order. it is invented: a documentation-range ip and a reserved domain, not customer data
+      steps: [
+        { panel: 'events', verb: 'Search', query: 'VPN logins, last 24 hours', caption: 'Logs arrive from firewalls, AD, VPN and EDR. The AI parser maps each new source onto one schema, with no hand-written parser.' },
+        { panel: 'risk', verb: 'Score', query: '203.0.113.61', caption: 'Anomaly detection scores 203.0.113.61 against the tenant’s baseline: off-hours, one service, one country.' },
+        { panel: 'intel', verb: 'Look up', query: '203.0.113.61', caption: 'Threat intelligence checks the address, domain and file hash it touched.' },
+        { panel: 'chain', verb: 'Link', query: 'j.doe', caption: 'The correlation engine joins night probes, failed logins and a j.doe login into one VPN break-in.' },
+        { panel: 'alerts', verb: 'Filter', query: 'Today’s alerts', caption: 'The analyst gets one high warning. Whitelists, dedup and suppression keep the rest out.' },
+        { panel: 'agent', verb: 'Ask', query: 'Why was this raised?', caption: 'Asked why it was raised, the AI assistant answers in plain language.' },
       ],
-      boxes: [
-        { rect: [200, 40, 280, 44], at: 1 },
-        { rect: [200, 172, 280, 44], at: 2 },
-        { rect: [200, 304, 280, 44], at: 3 },
-        { rect: [200, 436, 280, 44], at: 4 },
-      ],
-      labels: [
-        { x: 340, y: 62, text: 'log sources', at: 1 },
-        { x: 340, y: 194, text: 'collectors and parsers', at: 2 },
-        { x: 340, y: 326, text: 'detection and ai', tone: 'primary', at: 3 },
-        { x: 340, y: 458, text: 'management panel', at: 4 },
-      ],
-      captions: [
-        'A raw firewall log arrives from one of the vendor sources: Check Point, F5, CrowdStrike, VMware ESXi.',
-        'The AI parser maps it onto the platform schema. No hand-written parser for this source.',
-        'Detection scores it against the tenant’s baseline and maps it to a MITRE ATT&CK technique.',
-        'The analyst sees one alert in the management panel, already explained.',
-      ],
-      // the event is invented for illustration: private and documentation-range ips, not customer data
-      cards: [
-        { title: 'raw log, as it arrives', lines: ['Oct 30 08:24:11 fw01 drop', 'src=10.0.4.12 dst=203.0.113.9', 'dport=22 proto=tcp'] },
-        { title: 'parsed onto the schema', lines: ['src_ip    10.0.4.12', 'dst_ip    203.0.113.9', 'dst_port  22', 'action    drop'] },
-        { title: 'flagged', lines: ['anomaly: repeated drops on :22', 'MITRE ATT&CK  T1110', 'Brute Force'] },
-        { title: 'in the management panel', lines: ['alert  Brute Force on fw01', '10.0.4.12 → 203.0.113.9:22', 'explained by the AI assistant'] },
-      ],
-      packets: 'current',
     },
     facts: [
       { label: 'Role', value: 'Full-stack engineer, MozoX' },

@@ -1,23 +1,16 @@
 ---
 import { Image } from 'astro:assets';
 import type { Visual } from '../data';
+import SiemConsole from './SiemConsole.astro';
 import '../styles/scenes.css';
-
-// the accent tick joining a lit stage to its card, in viewBox units
-const TICK_LENGTH = 34;
 
 // `still` renders the finished visual with no steps, as the case pages show it
 const { visual, still = false } = Astro.props as { visual: Visual; still?: boolean };
-const scene = visual.kind === 'diagram' && !still ? visual : undefined;
-const steps = scene?.captions.length ?? 0;
+const captions =
+  still || visual.kind === 'phone' ? [] : visual.kind === 'diagram' ? visual.captions : visual.steps.map(s => s.caption);
+const scene = captions.length > 0;
+const steps = captions.length;
 const pad = (n: number) => String(n).padStart(2, '0');
-// each card and tick sits level with the centre of the stage lit in the same step
-const stages = scene?.cards?.map((card, i) => {
-  const box = scene.boxes.find(b => b.at === i + 1);
-  if (!box) throw new Error(`${visual.label}: no box lights in step ${i + 1} for its card`);
-  const [x, y, width, height] = box.rect;
-  return { card, at: i + 1, right: x + width, middle: y + height / 2 };
-});
 const Wrap = scene ? 'figure' : Fragment;
 const wrap = scene ? { class: 'scene', 'data-steps': steps } : {};
 ---
@@ -25,47 +18,34 @@ const wrap = scene ? { class: 'scene', 'data-steps': steps } : {};
 <Wrap {...wrap}>
   <div class="project-visual">
     {visual.kind === 'diagram' ? (
-      <svg
-        class="diagram"
-        role="img"
-        aria-label={visual.label}
-        viewBox="0 0 680 520"
-        data-packets={scene?.packets === 'current' ? 'current' : undefined}
-      >
+      <svg class="diagram" role="img" aria-label={visual.label} viewBox="0 0 680 520">
         <g class="diagram-body">
-          <g class="diagram-edges">{visual.edges.map(({ d, at }) => <path d={d} data-at={scene && at} />)}</g>
-          <g class="diagram-packets">{visual.edges.map(({ d, at }) => <path d={d} data-at={scene && at} />)}</g>
+          <g class="diagram-edges">{visual.edges.map(({ d, at }) => <path d={d} data-at={scene ? at : undefined} />)}</g>
+          <g class="diagram-packets">{visual.edges.map(({ d, at }) => <path d={d} data-at={scene ? at : undefined} />)}</g>
           <g class="diagram-boxes">
             {visual.boxes.map(({ rect: [x, y, width, height], at }) => (
-              <rect x={x} y={y} width={width} height={height} data-at={scene && at} />
+              <rect x={x} y={y} width={width} height={height} data-at={scene ? at : undefined} />
             ))}
           </g>
           <g class="diagram-labels">
             {visual.labels.map(({ x, y, text, tone, at }) => (
-              <text x={x} y={y} data-tone={tone} data-at={scene && at}>{text}</text>
+              <text x={x} y={y} data-tone={tone} data-at={scene ? at : undefined}>{text}</text>
             ))}
           </g>
-          {stages?.map(({ at, right, middle }) => (
-            <path class="scene-tick" data-at={at} d={`M${right} ${middle} L${right + TICK_LENGTH} ${middle}`} />
-          ))}
         </g>
       </svg>
+    ) : visual.kind === 'console' ? (
+      <SiemConsole visual={visual} scene={scene} />
     ) : (
       <div class="phone">
         <Image src={visual.image} alt={visual.alt} widths={[230, 460, 690]} sizes="230px" />
       </div>
     )}
   </div>
-  {stages?.map(({ card, at, middle }) => (
-    <div class="scene-card" data-at={at} style={`--y: ${middle}`}>
-      <span class="scene-card-title">{card.title}</span>
-      {card.lines.map(line => <span>{line}</span>)}
-    </div>
-  ))}
   {scene && (
     <figcaption>
       <ol class="scene-captions">
-        {scene.captions.map((caption, i) => (
+        {captions.map((caption, i) => (
           <li data-at={i + 1}>
             <span class="scene-count">{`${pad(i + 1)} / ${pad(steps)}`}</span> <span>{caption}</span>
           </li>

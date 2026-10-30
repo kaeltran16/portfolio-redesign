@@ -130,12 +130,12 @@ const sceneKit = `
   const within = (inner, outer) => inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5
     && inner.top >= outer.top - 0.5 && inner.bottom <= outer.bottom + 0.5;
 `;
-// returns an error string unless the row shows step k: elements ahead faint, packets on the right edges,
-// only the k-th caption and, for siem, only the k-th card and tick, with the card inside the figure and the viewport
+// returns an error string unless the row shows step k: diagram elements ahead faint and packets on the reached
+// edges, or for the siem console only the k-th panel lit and the k-th command in its box, inside the box; and only
+// the k-th caption
 const showsStep = (n, k) => `(() => {
   ${sceneKit}
   const row = document.querySelector('${row(n)}');
-  const siem = ${n === SIEM};
   const errors = [];
   if (row.dataset.step !== '${k}') errors.push('row is at step ' + row.dataset.step);
   for (const el of litOf(row)) {
@@ -143,17 +143,20 @@ const showsStep = (n, k) => `(() => {
     if (opacityOf(el) !== want) errors.push(el.tagName + ' of step ' + at(el) + ' has opacity ' + opacityOf(el) + ', not ' + want);
   }
   for (const el of row.querySelectorAll('.diagram-packets [data-at]')) {
-    const want = (siem ? at(el) === ${k} : at(el) <= ${k}) ? '1' : '0';
+    const want = at(el) <= ${k} ? '1' : '0';
     if (opacityOf(el) !== want) errors.push('packet of step ' + at(el) + ' has opacity ' + opacityOf(el) + ', not ' + want);
   }
-  const parts = siem ? ['.scene-captions li', '.scene-card', '.scene-tick'] : ['.scene-captions li'];
+  for (const el of row.querySelectorAll('.console .p')) {
+    const want = at(el) === ${k} ? '1' : '0.4';
+    if (opacityOf(el) !== want) errors.push('panel of step ' + at(el) + ' has opacity ' + opacityOf(el) + ', not ' + want);
+  }
+  const parts = ${n === SIEM} ? ['.scene-captions li', '.cmd-line'] : ['.scene-captions li'];
   for (const part of parts) {
     const shown = [...row.querySelectorAll(part)].filter(onScreen).map(at);
     if (shown.join() !== '${k}') errors.push(part + ' shows steps [' + shown.join(', ') + '], not only ${k}');
   }
-  const card = row.querySelector('.scene-card[data-at="${k}"]')?.getBoundingClientRect();
-  if (card && !within(card, row.querySelector('.scene').getBoundingClientRect())) errors.push('card runs out of its figure');
-  if (card && !within(card, { left: 0, top: 0, right: innerWidth, bottom: innerHeight })) errors.push('card runs out of the viewport');
+  const dash = row.querySelector('.console')?.getBoundingClientRect();
+  if (dash && !within(dash, row.querySelector('.project-visual').getBoundingClientRect())) errors.push('console runs out of its box');
   return errors.join('; ');
 })()`;
 // returns an error string unless the row is pinned with its text sticky and its box in the viewport
@@ -167,10 +170,11 @@ const pinned = n => `(() => {
   if (!within(box, { left: 0, top: 0, right: innerWidth, bottom: innerHeight })) errors.push('box is not wholly in the viewport');
   return errors.join('; ');
 })()`;
-const sceneText = n => `.scene-captions li span${n === SIEM ? ', .scene-card span' : ''}`;
+// the console keeps its own dark palette in both themes, like a screenshot, so only the captions are checked
+const sceneText = '.scene-captions li span';
 const sceneScenarios = [
   ...[1, 2, 3].map(k => [ARC, 'arc', k, false]),
-  ...[1, 2, 3, 4].map(k => [SIEM, 'siem', k, false]),
+  ...[1, 2, 3, 4, 5, 6].map(k => [SIEM, 'siem', k, false]),
   [ARC, 'arc', 2, true],
   [SIEM, 'siem', 3, true],
 ].map(([n, slug, k, light]) => ({
@@ -178,8 +182,8 @@ const sceneScenarios = [
   viewport: desktop,
   waitMs: 1000,
   eval: light ? `${toggleTheme}; ${toStep(n, k)}` : toStep(n, k),
-  check: allOf(pinned(n), showsStep(n, k), readable(row(n), sceneText(n))),
-  step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 3 : 4}, ${light ? 'light' : 'dark'}: row pinned, elements ahead faint, packets on the reached edges${slug === 'siem' ? ' (only the one into the lit stage), the stage’s card and tick beside it' : ''}, only caption ${k} shown, text at 4.5:1 or more`,
+  check: allOf(pinned(n), showsStep(n, k), readable(row(n), sceneText)),
+  step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 3 : 6}, ${light ? 'light' : 'dark'}: row pinned, ${slug === 'siem' ? `only panel ${k} lit and its command in the box` : 'elements ahead faint, packets on the reached edges'}, only caption ${k} shown, text at 4.5:1 or more`,
 }));
 
 // page-side helpers for the scroll checks
@@ -293,18 +297,18 @@ const SCENARIOS = [
       const row = document.querySelector('${row(SIEM)}');
       if (row.dataset.step !== '2') return 'row is at step ' + row.dataset.step + ', not 2';
       if (row.hasAttribute('data-pinned')) return 'row is pinned on a phone';
-      const cards = [...row.querySelectorAll('.scene-card')].filter(onScreen);
-      if (cards.map(at).join() !== '2') return 'cards shown for steps [' + cards.map(at).join(', ') + '], not only 2';
-      const card = cards[0].getBoundingClientRect();
+      const panels = [...row.querySelectorAll('.console .p')].filter(onScreen);
+      if (panels.map(at).join() !== '2') return 'panels shown for steps [' + panels.map(at).join(', ') + '], not only 2';
+      const dash = row.querySelector('.console').getBoundingClientRect();
       const box = row.querySelector('.project-visual').getBoundingClientRect();
       const text = row.querySelector('.project-text').getBoundingClientRect();
       const caption = [...row.querySelectorAll('.scene-captions li')].find(onScreen)?.getBoundingClientRect();
-      if (card.top < box.bottom - 0.5) return 'card overlaps the diagram box';
-      if (card.left < -0.5 || card.right > innerWidth + 0.5) return 'card runs past the viewport width';
-      if (caption && card.bottom > caption.top + 0.5) return 'card overlaps the step caption';
-      return card.bottom > text.top + 0.5 ? 'card overlaps the row text' : '';
+      if (!within(dash, box)) return 'console runs out of its box';
+      if (dash.left < -0.5 || dash.right > innerWidth + 0.5) return 'console runs past the viewport width';
+      if (caption && box.bottom > caption.top + 0.5) return 'box overlaps the step caption';
+      return box.bottom > text.top + 0.5 ? 'box overlaps the row text' : '';
     })()`,
-    step: 'siem scene scrolled to step 2 on a 390px phone: not pinned, the card sits under the diagram box, inside the width, above the caption and the row text',
+    step: 'siem scene scrolled to step 2 on a 390px phone: not pinned, only the risk panel shows, the console inside its box and the width, above the caption and the row text',
   },
   {
     name: 'scenes-phone-390',
@@ -317,8 +321,8 @@ const SCENARIOS = [
       const seen = sceneRows.map(() => new Set());
       const { top, bottom } = projects.getBoundingClientRect();
       const start = scrollY + top - innerHeight;
-      // an eighth of the viewport per move is finer than the reveal's 0.6 viewport split into 4 steps
-      for (let y = start; y <= scrollY + bottom; y += innerHeight / 8) {
+      // a twelfth of the viewport per move is finer than the reveal's 0.6 viewport split into 6 steps
+      for (let y = start; y <= scrollY + bottom; y += innerHeight / 12) {
         window.scrollTo({ top: y, behavior: 'instant' });
         await ${frames};
         for (const el of stickies()) errors.add('.' + el.className + ' is sticky');
@@ -449,11 +453,13 @@ const SCENARIOS = [
       if (dim.length) errors.push(dim.length + ' diagram elements are not fully lit');
       const hidden = [...projects.querySelectorAll('.scene-captions li')].filter(el => !onScreen(el));
       if (hidden.length) errors.push(hidden.length + ' step captions are not listed');
-      if ([...projects.querySelectorAll('.scene-card, .scene-tick')].some(onScreen)) errors.push('a siem card or tick shows');
+      const unlit = [...projects.querySelectorAll('.console .p')].filter(el => !onScreen(el) || opacityOf(el) !== '1');
+      if (unlit.length) errors.push(unlit.length + ' console panels are not shown fully lit');
+      if ([...projects.querySelectorAll('.cmd')].some(onScreen)) errors.push('the siem command box shows');
       return errors.join('; ');
     })()`),
     clip: '#projects',
-    step: 'scenes under reduced motion: no steps, every diagram lit, packets still, every caption listed, no siem card',
+    step: 'scenes under reduced motion: no steps, every diagram and console panel lit, packets still, every caption listed, no command box',
   },
   {
     name: 'scene-opal',
