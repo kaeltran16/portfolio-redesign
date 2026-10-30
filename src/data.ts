@@ -24,10 +24,22 @@ export const social = [
   },
 ];
 
-// diagrams are drawn in a 680x520 viewBox, the same box every visual sits in
-type Label = { x: number; y: number; text: string; tone?: 'primary' | 'caption' };
+// diagrams are drawn in a 680x520 viewBox, the same box every visual sits in.
+// `at` is the scroll step an element lights up in, counted from 1; there is one caption per step
+type Label = { x: number; y: number; text: string; tone?: 'primary' | 'caption'; at: number };
 export type Visual =
-  | { kind: 'diagram'; label: string; edges: string[]; boxes: [number, number, number, number][]; labels: Label[] }
+  | {
+      kind: 'diagram';
+      label: string;
+      edges: { d: string; at: number }[];
+      boxes: { rect: [number, number, number, number]; at: number }[];
+      labels: Label[];
+      captions: string[];
+      // one per step: what the sample event looks like at the lit stage
+      cards?: { title: string; lines: string[] }[];
+      // packets run on every reached edge, or only on the edge into the current step
+      packets?: 'reached' | 'current';
+    }
   | { kind: 'phone'; image: ImageMetadata; alt: string };
 type Project = {
   slug: string;
@@ -47,34 +59,39 @@ export const projects: Project[] = [
       kind: 'diagram',
       label: 'Arc: agent tabs and runs call wsh, which records runs, initiatives and notes in Arc, shown in the cockpit',
       edges: [
-        'M130 84 C130 112 340 112 340 140',
-        'M340 84 L340 140',
-        'M550 84 C550 112 340 112 340 140',
-        'M340 184 L340 240',
-        'M340 370 L340 436',
+        { d: 'M130 84 C130 112 340 112 340 140', at: 2 },
+        { d: 'M340 84 L340 140', at: 2 },
+        { d: 'M550 84 C550 112 340 112 340 140', at: 2 },
+        { d: 'M340 184 L340 240', at: 2 },
+        { d: 'M340 370 L340 436', at: 3 },
       ],
       boxes: [
-        [40, 40, 180, 44],
-        [250, 40, 180, 44],
-        [460, 40, 180, 44],
-        [280, 140, 120, 44],
-        [120, 240, 440, 130],
-        [138, 300, 124, 44],
-        [278, 300, 124, 44],
-        [418, 300, 124, 44],
-        [280, 436, 120, 44],
+        { rect: [40, 40, 180, 44], at: 1 },
+        { rect: [250, 40, 180, 44], at: 1 },
+        { rect: [460, 40, 180, 44], at: 1 },
+        { rect: [280, 140, 120, 44], at: 2 },
+        { rect: [120, 240, 440, 130], at: 2 },
+        { rect: [138, 300, 124, 44], at: 2 },
+        { rect: [278, 300, 124, 44], at: 2 },
+        { rect: [418, 300, 124, 44], at: 2 },
+        { rect: [280, 436, 120, 44], at: 3 },
       ],
       labels: [
-        { x: 40, y: 24, text: 'agents', tone: 'caption' },
-        { x: 130, y: 62, text: 'claude code' },
-        { x: 340, y: 62, text: 'claude code' },
-        { x: 550, y: 62, text: 'run' },
-        { x: 340, y: 162, text: 'wsh' },
-        { x: 340, y: 270, text: 'arc', tone: 'primary' },
-        { x: 200, y: 322, text: 'runs' },
-        { x: 340, y: 322, text: 'initiatives' },
-        { x: 480, y: 322, text: 'notes' },
-        { x: 340, y: 458, text: 'cockpit' },
+        { x: 40, y: 24, text: 'agents', tone: 'caption', at: 1 },
+        { x: 130, y: 62, text: 'claude code', at: 1 },
+        { x: 340, y: 62, text: 'claude code', at: 1 },
+        { x: 550, y: 62, text: 'run', at: 1 },
+        { x: 340, y: 162, text: 'wsh', at: 2 },
+        { x: 340, y: 270, text: 'arc', tone: 'primary', at: 2 },
+        { x: 200, y: 322, text: 'runs', at: 2 },
+        { x: 340, y: 322, text: 'initiatives', at: 2 },
+        { x: 480, y: 322, text: 'notes', at: 2 },
+        { x: 340, y: 458, text: 'cockpit', at: 3 },
+      ],
+      captions: [
+        'Agents run in their own terminals: Claude Code sessions and orchestrated runs.',
+        'Each one reports through wsh, and Arc records it as runs, initiatives and notes.',
+        'The cockpit shows all of it beside the terminal.',
       ],
     },
     facts: [
@@ -119,19 +136,37 @@ export const projects: Project[] = [
     visual: {
       kind: 'diagram',
       label: 'SIEM: log sources flow through collectors and parsers into detection and AI, shown in the management panel',
-      edges: ['M340 84 L340 172', 'M340 216 L340 304', 'M340 348 L340 436'],
+      edges: [
+        { d: 'M340 84 L340 172', at: 2 },
+        { d: 'M340 216 L340 304', at: 3 },
+        { d: 'M340 348 L340 436', at: 4 },
+      ],
       boxes: [
-        [200, 40, 280, 44],
-        [200, 172, 280, 44],
-        [200, 304, 280, 44],
-        [200, 436, 280, 44],
+        { rect: [200, 40, 280, 44], at: 1 },
+        { rect: [200, 172, 280, 44], at: 2 },
+        { rect: [200, 304, 280, 44], at: 3 },
+        { rect: [200, 436, 280, 44], at: 4 },
       ],
       labels: [
-        { x: 340, y: 62, text: 'log sources' },
-        { x: 340, y: 194, text: 'collectors and parsers' },
-        { x: 340, y: 326, text: 'detection and ai', tone: 'primary' },
-        { x: 340, y: 458, text: 'management panel' },
+        { x: 340, y: 62, text: 'log sources', at: 1 },
+        { x: 340, y: 194, text: 'collectors and parsers', at: 2 },
+        { x: 340, y: 326, text: 'detection and ai', tone: 'primary', at: 3 },
+        { x: 340, y: 458, text: 'management panel', at: 4 },
       ],
+      captions: [
+        'A raw firewall log arrives from one of the vendor sources: Check Point, F5, CrowdStrike, VMware ESXi.',
+        'The AI parser maps it onto the platform schema. No hand-written parser for this source.',
+        'Detection scores it against the tenant’s baseline and maps it to a MITRE ATT&CK technique.',
+        'The analyst sees one alert in the management panel, already explained.',
+      ],
+      // the event is invented for illustration: private and documentation-range ips, not customer data
+      cards: [
+        { title: 'raw log, as it arrives', lines: ['Oct 30 08:24:11 fw01 drop', 'src=10.0.4.12 dst=203.0.113.9', 'dport=22 proto=tcp'] },
+        { title: 'parsed onto the schema', lines: ['src_ip    10.0.4.12', 'dst_ip    203.0.113.9', 'dst_port  22', 'action    drop'] },
+        { title: 'flagged', lines: ['anomaly: repeated drops on :22', 'MITRE ATT&CK  T1110', 'Brute Force'] },
+        { title: 'in the management panel', lines: ['alert  Brute Force on fw01', '10.0.4.12 → 203.0.113.9:22', 'explained by the AI assistant'] },
+      ],
+      packets: 'current',
     },
     facts: [
       { label: 'Role', value: 'Full-stack engineer, MozoX' },

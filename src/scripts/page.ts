@@ -1,3 +1,4 @@
+import { canPin, fillFraction, pinProgress, READING_LINE, revealProgress, stepAt } from '../lib/scene';
 import { decode } from './decoder';
 import type { Sphere, Theme } from './sphere';
 
@@ -116,11 +117,82 @@ document.addEventListener('themechange', () => {
   playIntro();
 });
 
+// --- scroll scenes -----------------------------------------------------------------------------
+
+const sceneRows = [...document.querySelectorAll<HTMLElement>('.project')].filter(row =>
+  row.querySelector('figure.scene[data-steps]'),
+);
+const timeline = document.querySelector<HTMLElement>('.experience-list');
+const timelineRoles = [...document.querySelectorAll<HTMLElement>('.experience-role')];
+
+const stepsOf = (row: HTMLElement) => Number(row.querySelector<HTMLElement>('.scene')!.dataset.steps);
+const heightOf = (row: HTMLElement, selector: string) =>
+  row.querySelector<HTMLElement>(selector)?.getBoundingClientRect().height ?? 0;
+
+// natural heights need the pin's tall track gone, so unpin first; that can clamp the scroll
+// position when the page shrinks, which is put back if no row changed mode
+function measureScenes() {
+  const scrollTop = window.scrollY;
+  const wasPinned = sceneRows.map(row => row.hasAttribute('data-pinned'));
+  sceneRows.forEach(row => row.removeAttribute('data-pinned'));
+  const fits = sceneRows.map(row =>
+    canPin(innerWidth, innerHeight, Math.max(heightOf(row, '.project-text'), heightOf(row, '.scene'))),
+  );
+  sceneRows.forEach((row, i) => {
+    row.toggleAttribute('data-pinned', fits[i]);
+    if (fits[i]) row.style.setProperty('--steps', String(stepsOf(row)));
+    else row.style.removeProperty('--steps');
+  });
+  if (fits.every((fit, i) => fit === wasPinned[i]) && window.scrollY !== scrollTop) {
+    window.scrollTo({ top: scrollTop, behavior: 'instant' });
+  }
+  updateScenes();
+}
+
+function rowProgress(row: HTMLElement) {
+  if (row.hasAttribute('data-pinned')) {
+    const { top, height } = row.getBoundingClientRect();
+    return pinProgress(top, height, innerHeight);
+  }
+  const { top, height } = row.querySelector<HTMLElement>('.project-visual')!.getBoundingClientRect();
+  return revealProgress(top + height / 2, innerHeight);
+}
+
+function updateScenes() {
+  sceneRows.forEach(row => {
+    const step = String(stepAt(rowProgress(row), stepsOf(row)));
+    if (row.dataset.step !== step) row.dataset.step = step;
+  });
+
+  const line = READING_LINE * innerHeight;
+  timelineRoles.forEach(role => {
+    const { top, height } = role.getBoundingClientRect();
+    const fill = fillFraction(top, height, line);
+    role.style.setProperty('--fill', String(fill));
+    role.toggleAttribute('data-reached', fill > 0);
+  });
+}
+
+if (!reduceMotion) {
+  timeline?.toggleAttribute('data-drawing', true);
+  window.addEventListener('resize', measureScenes);
+  // the web font changes line heights after first layout, so a row's content height with it
+  document.fonts.addEventListener('loadingdone', measureScenes);
+  measureScenes();
+}
+
 // --- scroll cue --------------------------------------------------------------------------------
 
 const cues = document.querySelectorAll<HTMLElement>('[data-scroll-cue]');
 const updateCue = () => cues.forEach(c => (c.dataset.hidden = String(window.scrollY > 0)));
-window.addEventListener('scroll', updateCue, { passive: true });
+window.addEventListener(
+  'scroll',
+  () => {
+    updateCue();
+    if (!reduceMotion) updateScenes();
+  },
+  { passive: true },
+);
 updateCue();
 
 playIntro();

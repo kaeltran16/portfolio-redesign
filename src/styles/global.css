@@ -94,7 +94,8 @@ body {
   background-color: var(--background);
   color: var(--textBody);
   transition: background var(--durationM) ease;
-  overflow-x: hidden;
+  /* clip, not hidden: hidden makes body a scroll container that never scrolls, so the pinned rows could not stick */
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -871,17 +872,34 @@ body {
     width: 12px;
     height: 12px;
     margin-top: var(--spaceS);
-    border: 2px solid color-mix(in lab, var(--text) 35%, transparent);
+    border: 2px solid var(--accent);
+    background: var(--accent);
   }
 
   &::after {
     content: '';
     flex: 1 1 auto;
     width: 2px;
-    background: color-mix(in lab, var(--text) 15%, transparent);
+    background: var(--accent);
   }
 
-  [data-current] &::before {
+  /* the driver sets --fill (0..1) and data-reached per role as the page scrolls */
+  .experience-list[data-drawing] &::before {
+    border-color: color-mix(in lab, var(--text) 35%, transparent);
+    background: var(--background);
+    transition:
+      border-color var(--durationM) var(--bezierFastoutSlowin),
+      background-color var(--durationM) var(--bezierFastoutSlowin);
+  }
+
+  .experience-list[data-drawing] &::after {
+    background: linear-gradient(
+      var(--accent) calc(var(--fill, 0) * 100%),
+      color-mix(in lab, var(--text) 15%, transparent) calc(var(--fill, 0) * 100%)
+    );
+  }
+
+  .experience-list[data-drawing] [data-reached] &::before {
     border-color: var(--accent);
     background: var(--accent);
   }
