@@ -166,6 +166,23 @@ const pinned = n => `(() => {
   if (!within(box, { left: 0, top: 0, right: innerWidth, bottom: innerHeight })) errors.push('box is not wholly in the viewport');
   return errors.join('; ');
 })()`;
+// returns an error string if the box moves from step to step, as it does when the step captions differ in height.
+// the css keys only on data-step, so setting it walks every step without scrolling; the walk replays the step's
+// fade-ins, so it waits for them before the screenshot
+const steady = n => `(async () => {
+  const row = document.querySelector('${row(n)}');
+  const box = row.querySelector('.project-visual');
+  const was = row.dataset.step;
+  const tops = [];
+  for (let k = 1; k <= Number(row.querySelector('.scene').dataset.steps); k++) {
+    row.dataset.step = k;
+    tops.push(Math.round(box.getBoundingClientRect().top));
+  }
+  row.dataset.step = was;
+  const replayed = row.getAnimations({ subtree: true }).filter(a => a.effect.getComputedTiming().endTime !== Infinity);
+  await Promise.all(replayed.map(a => a.finished));
+  return new Set(tops).size > 1 ? 'box moves between steps, tops ' + tops.join(', ') : '';
+})()`;
 // the consoles keep their own dark palette in both themes, like a screenshot, so only the captions are checked
 const sceneText = '.scene-captions li span';
 const sceneScenarios = [
@@ -180,6 +197,15 @@ const sceneScenarios = [
   eval: light ? `${toggleTheme}; ${toStep(n, k)}` : toStep(n, k),
   check: allOf(pinned(n), showsStep(n, k), readable(row(n), sceneText)),
   step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 4 : 6}, ${light ? 'light' : 'dark'}: row pinned, only panel ${k} lit and its command in the box, only caption ${k} shown, text at 4.5:1 or more`,
+}));
+const steadyScenarios = [[ARC, 'arc'], [SIEM, 'siem']].map(([n, slug]) => ({
+  name: `scene-${slug}-steady`,
+  viewport: desktop,
+  waitMs: 1000,
+  eval: toStep(n, 1),
+  // steady is async, which allOf does not await
+  check: `(async () => [${pinned(n)}, await ${steady(n)}].filter(Boolean).join('; '))()`,
+  step: `${slug} scene pinned: the box holds still across every step, though the step captions differ in height`,
 }));
 
 // page-side helpers for the scroll checks
@@ -283,6 +309,7 @@ const SCENARIOS = [
     step: `${slug} case study at ${viewport.width}px, ${light ? 'light' : 'dark'}: fits the width, text at 4.5:1 or more, the finished visual with no scene`,
   }))),
   ...sceneScenarios,
+  ...steadyScenarios,
   {
     name: 'scene-siem-2-phone-390',
     viewport: phone,

@@ -71,14 +71,15 @@
   white-space: nowrap;
 }
 
-/* in a step only the current caption shows; the rest stay readable to screen readers, as .visually-hidden */
+/* in a step only the current caption shows; the rest stay readable to screen readers. all share one cell, so the
+   list keeps the tallest caption's height and the centred box holds still when a caption has fewer lines */
+.project[data-step] .scene-captions {
+  display: grid;
+}
+
 .project[data-step] .scene-captions li {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  grid-area: 1 / 1;
+  opacity: 0;
 
   &:is(
       [data-step='1'] [data-at='1'],
@@ -88,12 +89,7 @@
       [data-step='5'] [data-at='5'],
       [data-step='6'] [data-at='6']
     ) {
-    position: static;
-    width: auto;
-    height: auto;
-    overflow: visible;
-    clip-path: none;
-    white-space: normal;
+    opacity: 1;
     animation: fade-in var(--durationM) var(--bezierFastoutSlowin);
   }
 }
