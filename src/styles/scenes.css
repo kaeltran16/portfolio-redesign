@@ -1,6 +1,7 @@
-/* scroll scenes on home: the arc and siem rows play their product consoles (console.css) in steps. page.ts writes
-   the step on the row (data-step); a row without one is in static mode, for no js and reduced motion: everything
-   lit, captions listed. each element's step is its data-at. css cannot name a selector, so the current-step list,
+/* scroll scenes on home: the arc and siem rows play their product consoles (console.css) in steps, and opal's phone
+   slides through its screens. page.ts writes the step on the row (data-step); a row without one is in static mode,
+   for no js and reduced motion: everything lit, the phone on its first screen, captions listed. each element's step
+   is its data-at. css cannot name a selector, so the current-step list,
    :is([data-step='1'] [data-at='1'], ...), is written out to 6 steps */
 
 .scene {
@@ -91,5 +92,63 @@
     ) {
     opacity: 1;
     animation: fade-in var(--durationM) var(--bezierFastoutSlowin);
+  }
+}
+
+/* --- phone ------------------------------------------------------------------------------------ */
+
+.project[data-step='1'] { --step: 1; }
+.project[data-step='2'] { --step: 2; }
+.project[data-step='3'] { --step: 3; }
+.project[data-step='4'] { --step: 4; }
+.project[data-step='5'] { --step: 5; }
+.project[data-step='6'] { --step: 6; }
+
+/* the screens share one cell; each waits a screen's width left or right of the current one, so a step slides the
+   next one in. with no step the first screen shows */
+.scene .phone {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+
+  img {
+    grid-area: 1 / 1;
+    transform: translateX(calc(clamp(-1, var(--at) - var(--step, 1), 1) * 100%));
+    transition: transform var(--durationL) var(--bezierFastoutSlowin);
+  }
+}
+
+.phone-names {
+  display: none;
+}
+
+/* the spec marks the current name in accent; --primary is accent in dark and black in light, as for the counter */
+.project[data-step] .phone-names {
+  display: flex;
+  justify-content: center;
+  gap: var(--spaceL);
+  margin: var(--spaceM) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fontSizeBodyS);
+  color: var(--textBody);
+
+  li {
+    padding-bottom: 4px;
+    border-bottom: 2px solid transparent;
+    transition:
+      color var(--durationM) ease,
+      border-color var(--durationM) ease;
+  }
+
+  li:is(
+      [data-step='1'] [data-at='1'],
+      [data-step='2'] [data-at='2'],
+      [data-step='3'] [data-at='3'],
+      [data-step='4'] [data-at='4'],
+      [data-step='5'] [data-at='5'],
+      [data-step='6'] [data-at='6']
+    ) {
+    color: var(--primary);
+    border-color: var(--primary);
   }
 }

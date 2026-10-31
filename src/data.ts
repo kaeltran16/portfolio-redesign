@@ -1,6 +1,9 @@
 // shared by Home and the case-study pages. case-study copy is a draft until khang finalizes it.
 import type { ImageMetadata } from 'astro';
+import opalAreas from './assets/opal-areas.png';
 import opalToday from './assets/opal-today.png';
+import opalWorkout from './assets/opal-workout.png';
+import opalYou from './assets/opal-you.png';
 
 export const name = 'Khang Tran';
 export const role = 'Full-stack';
@@ -32,7 +35,8 @@ export type ArcPanel = 'run' | 'worker' | 'ask' | 'diff';
 export type Visual =
   | { kind: 'console'; product: 'siem'; label: string; steps: ConsoleStep<SiemPanel>[] }
   | { kind: 'console'; product: 'arc'; label: string; steps: ConsoleStep<ArcPanel>[] }
-  | { kind: 'phone'; image: ImageMetadata; alt: string };
+  // a phone slides one screen per scroll step; a phone that does not step shows the first
+  | { kind: 'phone'; screens: { name: string; image: ImageMetadata; alt: string; caption: string }[] };
 type Project = {
   slug: string;
   title: string;
@@ -154,8 +158,32 @@ export const projects: Project[] = [
     // captured from the web build with seed data (dart_defines/dev.json), not real personal data
     visual: {
       kind: 'phone',
-      image: opalToday,
-      alt: "opal's Today screen: Pal suggests moving leg day to Friday because of rain, above the day's rituals",
+      screens: [
+        {
+          name: 'Today',
+          image: opalToday,
+          alt: "opal's Today screen: Pal suggests moving leg day to Friday because of rain, above the day's rituals",
+          caption: 'Today leads with the one thing worth doing now: Pal moves leg day to Friday, clear of the rain.',
+        },
+        {
+          name: 'Areas',
+          image: opalAreas,
+          alt: "opal's Areas screen: rings for Move and Routines, a note that Money is worth a look, and money, nutrition and sleep below",
+          caption: 'Areas rings movement and routines, and points at the one that needs care.',
+        },
+        {
+          name: 'Workout',
+          image: opalWorkout,
+          alt: "opal's Workout screen: Push Day A is done, two of five workouts this week, with volume, time and a new record",
+          caption: 'Workout keeps the week’s sessions, volume and records, and marks a new best when one lands.',
+        },
+        {
+          name: 'You',
+          image: opalYou,
+          alt: "opal's You screen: Pal noticed mood runs higher on ritual days, above other patterns in spending and sleep",
+          caption: 'You is where Pal reads across areas, like mood running higher on days the rituals get done.',
+        },
+      ],
     },
     facts: [
       { label: 'Role', value: 'Solo, personal project' },

@@ -85,6 +85,8 @@ Rejected by the judge: three.js scenes (redraws SVG text as 3D, loses crisp text
 
 ## Deferred: opal
 
+**Landed 2026-10-31:** the Areas, Workout and You captures were taken on a machine with Flutter (same seed build, 390x844 at 3x, dark, onboarding skipped through `localStorage`), and the scene was built from this spec without the board, which stayed on the other machine. The four screens share the phone's one grid cell and each waits a screen's width beside the current one, so a step slides the next in. Without a step (no JS, reduced motion) the phone shows Today rather than the last frame, as the case page and its alt text lead with Today; the screen names show only in a step. Captions for all four screens are drafts. The history below is kept.
+
 Decided 2026-10-30: this pass does not build the opal scene. Its Areas, Workout and You captures need opal's Flutter web build, which is not available on this machine, and Khang will supply the captures later ("skip it, will supply that later"). Until then the opal row on Home renders exactly as today (the Today image, no pin, no screen names, no caption). The scene described above, the captures and the opal captions under "Left to the builder" land in a follow-up pass once the captures exist, built to `.superpowers/design/scroll-scenes/deferred/Opal.dc.html`.
 
 ## Data changes

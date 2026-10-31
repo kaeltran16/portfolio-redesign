@@ -7,12 +7,15 @@ import '../styles/scenes.css';
 
 // `still` renders the finished visual with no steps, as the case pages show it
 const { visual, still = false } = Astro.props as { visual: Visual; still?: boolean };
-const captions = still || visual.kind === 'phone' ? [] : visual.steps.map(s => s.caption);
+const steps = visual.kind === 'phone' ? visual.screens : visual.steps;
+const captions = still ? [] : steps.map(s => s.caption);
 const scene = captions.length > 0;
-const steps = captions.length;
 const pad = (n: number) => String(n).padStart(2, '0');
 const Wrap = scene ? 'figure' : Fragment;
-const wrap = scene ? { class: 'scene', 'data-steps': steps } : {};
+const wrap = scene ? { class: 'scene', 'data-steps': captions.length } : {};
+// a still phone shows its first screen only. the later screens wait clipped beside the phone, where lazy loading
+// would hold them back until they slide in, so they load eagerly
+const screens = visual.kind === 'phone' ? (scene ? visual.screens : visual.screens.slice(0, 1)) : [];
 ---
 
 <Wrap {...wrap}>
@@ -21,16 +24,31 @@ const wrap = scene ? { class: 'scene', 'data-steps': steps } : {};
       visual.product === 'siem' ? <SiemConsole visual={visual} scene={scene} /> : <ArcCockpit visual={visual} scene={scene} />
     ) : (
       <div class="phone">
-        <Image src={visual.image} alt={visual.alt} widths={[230, 460, 690]} sizes="230px" />
+        {screens.map(({ image, alt }, i) => (
+          <Image
+            src={image}
+            alt={alt}
+            widths={[230, 460, 690]}
+            sizes="230px"
+            style={`--at: ${i + 1}`}
+            data-at={scene ? i + 1 : undefined}
+            loading={i === 0 ? 'lazy' : 'eager'}
+          />
+        ))}
       </div>
     )}
   </div>
+  {scene && visual.kind === 'phone' && (
+    <ol class="phone-names" aria-hidden="true">
+      {visual.screens.map(({ name }, i) => <li data-at={i + 1}>{name}</li>)}
+    </ol>
+  )}
   {scene && (
     <figcaption>
       <ol class="scene-captions">
         {captions.map((caption, i) => (
           <li data-at={i + 1}>
-            <span class="scene-count">{`${pad(i + 1)} / ${pad(steps)}`}</span> <span>{caption}</span>
+            <span class="scene-count">{`${pad(i + 1)} / ${pad(captions.length)}`}</span> <span>{caption}</span>
           </li>
         ))}
       </ol>

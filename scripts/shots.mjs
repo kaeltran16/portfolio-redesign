@@ -88,8 +88,9 @@ const projectsFit = `(async () => {
   const projects = document.getElementById('projects');
   const wide = [...projects.querySelectorAll('*')].find(el => el.getBoundingClientRect().right > innerWidth + 0.5 && !clipped(el, projects));
   if (wide) return 'runs past the viewport: ' + wide.tagName + '.' + wide.getAttribute('class');
-  const spill = [...document.querySelectorAll('.phone')].find(p => p.scrollWidth > p.clientWidth || p.scrollHeight > p.clientHeight);
-  return spill ? 'screenshot spills out of its phone: ' + spill.querySelector('img')?.alt : '';
+  // layout sizes, before transforms: a scene's waiting screens are translated beside the phone on purpose
+  const spill = [...document.querySelectorAll('.phone img')].find(img => img.offsetWidth > img.parentElement.clientWidth || img.offsetHeight > img.parentElement.clientHeight);
+  return spill ? 'screenshot spills out of its phone: ' + spill.alt : '';
 })()`;
 // returns an error string naming any project link that does not load
 const projectLinksLoad = `Promise.all([...document.querySelectorAll('#projects .button')].map(a => fetch(a.href).then(r => r.ok ? '' : a.getAttribute('href') + ' ' + r.status)))
@@ -155,6 +156,31 @@ const showsStep = (n, k) => `(() => {
   }
   return errors.join('; ');
 })()`;
+// returns an error string unless the phone shows screen k (0 for a row with no step, which shows the first) with
+// every other screen outside it, and, in a step, only name k marked and only caption k shown
+const showsScreen = (n, k) => `(() => {
+  ${sceneKit}
+  const row = document.querySelector('${row(n)}');
+  const errors = [];
+  if ((row.dataset.step ?? '0') !== '${k}') errors.push('row is at step ' + row.dataset.step);
+  // the screen is the phone inside its bezel
+  const bezel = row.querySelector('.phone');
+  const outer = bezel.getBoundingClientRect();
+  const phone = { left: outer.left + bezel.clientLeft, top: outer.top + bezel.clientTop };
+  Object.assign(phone, { right: phone.left + bezel.clientWidth, bottom: phone.top + bezel.clientHeight });
+  const overlap = r => Math.max(0, Math.min(r.right, phone.right) - Math.max(r.left, phone.left));
+  [...row.querySelectorAll('.phone img')].forEach((img, i) => {
+    const r = img.getBoundingClientRect();
+    if (i + 1 === Math.max(1, ${k}) ? !within(r, phone) : overlap(r) > 0.5) errors.push('screen ' + (i + 1) + ' is ' + (overlap(r) > 0.5 ? 'in' : 'out of') + ' the phone');
+  });
+  if (${k}) {
+    const marked = [...row.querySelectorAll('.phone-names li')].filter(li => getComputedStyle(li).borderBottomColor !== 'rgba(0, 0, 0, 0)').map(at);
+    if (marked.join() !== '${k}') errors.push('names marked [' + marked.join(', ') + '], not only ${k}');
+    const shown = [...row.querySelectorAll('.scene-captions li')].filter(onScreen).map(at);
+    if (shown.join() !== '${k}') errors.push('captions show steps [' + shown.join(', ') + '], not only ${k}');
+  } else if ([...row.querySelectorAll('.phone-names')].some(onScreen)) errors.push('screen names show with no step');
+  return errors.join('; ');
+})()`;
 // returns an error string unless the row is pinned with its text sticky and its box in the viewport
 const pinned = n => `(() => {
   ${sceneKit}
@@ -198,7 +224,15 @@ const sceneScenarios = [
   check: allOf(pinned(n), showsStep(n, k), readable(row(n), sceneText)),
   step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 4 : 6}, ${light ? 'light' : 'dark'}: row pinned, only panel ${k} lit and its command in the box, only caption ${k} shown, text at 4.5:1 or more`,
 }));
-const steadyScenarios = [[ARC, 'arc'], [SIEM, 'siem']].map(([n, slug]) => ({
+const opalScenarios = [[1, false], [2, false], [3, false], [4, false], [2, true]].map(([k, light]) => ({
+  name: `scene-opal-${k}${light ? '-light' : ''}`,
+  viewport: desktop,
+  waitMs: 1000,
+  eval: light ? `${toggleTheme}; ${toStep(OPAL, k)}` : toStep(OPAL, k),
+  check: allOf(pinned(OPAL), showsScreen(OPAL, k), readable(row(OPAL), `${sceneText}, .phone-names li`)),
+  step: `opal scene scrolled to step ${k} of 4, ${light ? 'light' : 'dark'}: row pinned, only screen ${k} in the phone, only its name marked and its caption shown, text at 4.5:1 or more`,
+}));
+const steadyScenarios = [[ARC, 'arc'], [SIEM, 'siem'], [OPAL, 'opal']].map(([n, slug]) => ({
   name: `scene-${slug}-steady`,
   viewport: desktop,
   waitMs: 1000,
@@ -309,7 +343,16 @@ const SCENARIOS = [
     step: `${slug} case study at ${viewport.width}px, ${light ? 'light' : 'dark'}: fits the width, text at 4.5:1 or more, the finished visual with no scene`,
   }))),
   ...sceneScenarios,
+  ...opalScenarios,
   ...steadyScenarios,
+  {
+    name: 'scene-opal-2-phone-390',
+    viewport: phone,
+    waitMs: 1000,
+    eval: toRevealStep(OPAL, 2),
+    check: allOf(`document.querySelector('${row(OPAL)}').hasAttribute('data-pinned') ? 'opal row is pinned' : ''`, showsScreen(OPAL, 2), readable(row(OPAL), `${sceneText}, .phone-names li`)),
+    step: 'opal scene scrolled to step 2 on a 390px phone: not pinned, only the Areas screen in the phone, its name marked and its caption shown, within the width',
+  },
   {
     name: 'scene-siem-2-phone-390',
     viewport: phone,
@@ -478,23 +521,9 @@ const SCENARIOS = [
       if (unlit.length) errors.push(unlit.length + ' console panels are not shown fully lit');
       if ([...projects.querySelectorAll('.cmd')].some(onScreen)) errors.push('a command box shows');
       return errors.join('; ');
-    })()`),
+    })()`, showsScreen(OPAL, 0)),
     clip: '#projects',
-    step: 'scenes under reduced motion: no steps, every console panel lit, pulses still, every caption listed, no command box',
-  },
-  {
-    name: 'scene-opal',
-    viewport: desktop,
-    waitMs: 1000,
-    eval: `document.querySelector('${row(OPAL)}').scrollIntoView()`,
-    check: `(() => {
-      const row = document.querySelector('${row(OPAL)}');
-      if (row.querySelector('.scene')) return 'opal row renders a scene while its scene is deferred';
-      const images = row.querySelectorAll('.phone img').length;
-      return images === 1 ? '' : 'opal row shows ' + images + ' phone images, not 1';
-    })()`,
-    clip: row(OPAL),
-    step: 'opal row unchanged while its scene is deferred: no scene, one phone image',
+    step: 'scenes under reduced motion: no steps, every console panel lit, pulses still, every caption listed, no command box, the phone on its first screen with no names',
   },
   ...[
     ['experience', 'h2, h3, .experience-dates, .experience-company, .experience-body li'],

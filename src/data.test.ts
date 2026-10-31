@@ -27,6 +27,17 @@ describe('scene steps', () => {
     }
   });
 
+  it('walks opal through its four tabs in order, each screen with its own capture, alt and caption', () => {
+    const visual = projects.find(p => p.slug === 'opal')?.visual;
+    if (visual?.kind !== 'phone') throw new Error('opal has no phone');
+    expect(visual.screens.map(s => s.name)).toEqual(['Today', 'Areas', 'Workout', 'You']);
+    // vitest imports an image as its path, astro as metadata; either way four distinct imports
+    expect(new Set(visual.screens.map(s => s.image)).size).toBe(4);
+    for (const { alt, caption } of visual.screens) {
+      for (const text of [alt, caption]) expect(text.trim()).not.toBe('');
+    }
+  });
+
   it('tells siem about the invented attack only', () => {
     const text = consoleOf('siem').steps.flatMap(s => [s.query, s.caption]).join('\n');
     const ips = new Set(text.match(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g));
