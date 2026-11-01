@@ -286,10 +286,11 @@
   color: var(--danger);
 }
 
-/* the diff view cuts long lines at the pane's edge rather than wrapping them */
+/* the diff view cuts long lines at the pane's edge rather than wrapping them; the fade says the cut is the pane's */
 .arc-code {
   display: grid;
   overflow: hidden;
+  mask-image: linear-gradient(to right, #000 calc(100% - 40 * var(--px)), transparent);
   margin: 0 calc(-12 * var(--px));
   font-size: calc(10 * var(--px));
   line-height: 1.55;

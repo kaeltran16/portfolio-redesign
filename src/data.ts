@@ -118,7 +118,7 @@ export const projects: Project[] = [
     },
     facts: [
       { label: 'Role', value: 'Full-stack engineer, MozoX' },
-      { label: 'When', value: 'July 2023 – now' },
+      { label: 'When', value: 'April 2023 – now' },
       { label: 'Stack', value: 'Next.js and React, Java, Python, PostgreSQL, Elasticsearch' },
     ],
     sections: [
@@ -154,7 +154,7 @@ export const projects: Project[] = [
   {
     slug: 'opal',
     title: 'opal',
-    description: 'One app for money, movement, and the little rituals that hold your day together.',
+    description: 'An iOS app for money, movement, and the little rituals that hold your day together.',
     // captured from the web build with seed data (dart_defines/dev.json), not real personal data
     visual: {
       kind: 'phone',

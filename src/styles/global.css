@@ -1114,3 +1114,11 @@ body {
     transition-delay: 0s;
   }
 }
+
+/* --- 404 -------------------------------------------------------------------------------------- */
+
+/* nothing else is on the page, so the message sits mid-screen instead of in the header row */
+.not-found {
+  min-height: 100svh;
+  justify-content: center;
+}

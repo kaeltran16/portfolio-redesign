@@ -15,6 +15,7 @@ const { title, description } = Astro.props as { title: string; description: stri
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <script is:inline>
       // set before first paint so there is no theme flash, and so no-js visitors get the final state
       document.documentElement.classList.add('js');

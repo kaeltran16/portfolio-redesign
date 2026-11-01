@@ -1,0 +1,15 @@
+---
+import Base from '../layouts/Base.astro';
+import { name } from '../data';
+---
+
+<Base title={`Page not found | ${name}`} description="This page does not exist.">
+  <main class="case not-found">
+    <div class="case-intro">
+      <span class="project-index">404</span>
+      <h1 class="project-title">Page not found</h1>
+      <p class="project-description">This page does not exist, or it moved.</p>
+      <a class="button" href="/">Back to home</a>
+    </div>
+  </main>
+</Base>

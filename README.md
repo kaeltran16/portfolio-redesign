@@ -10,7 +10,7 @@ npm run shots   # screenshots of the running dev server (desktop, phone, light, 
 ```
 
 - The dark/light toggle sits top right. Under `prefers-reduced-motion` every effect stops and the content shows in its final state.
-- `public/cv.pdf` is a placeholder.
+- `public/cv.pdf` is the real CV, built from `job-search/resume_v2.md`; Experience on Home copies it, so keep the two in step.
 
 ## Credit
 
