@@ -12,6 +12,8 @@
 
 **Architecture:** `fill()` in `src/lib/shapes.ts` (line 215) clamps every component into [-1, 1], and presence into [0, 1], before storing it. As a result, the test `keeps positions in [-1, 1] and presence in [0, 1]` in `src/lib/shapes.test.ts` cannot fail. Since the last round, the clamp also distorts a shape: the siem-3 and siem-4 `SIEM_CLUSTERS` at y 0.92, with blob radius 0.18 (intel) or 0.12 (chain nodes), reach y 1.10 and 1.04, so their tops are cut flat. The fix removes the clamp and fits the parts that overshoot.
 
+**As built:** the distortion premise was stale. Fix round 1 had already set `CLUSTER_RADIUS = 0.08` (0.06 for chain nodes), so the cluster tops reach at most y 1.00. The worker measured every shape with the clamp removed: the largest |x|, |y| or |z| is 1.0000 (the opal frame and the siem-6 ring), and presence stays in [0, 1]. Step 2's expected failure did not occur, and Step 3 had nothing to fit. Only the clamp removal landed, so the range test now guards for real.
+
 **Tech Stack:** TypeScript, vitest, Chrome via CDP (`scripts/shots.mjs`).
 
 ## Decisions made beyond the design, and why

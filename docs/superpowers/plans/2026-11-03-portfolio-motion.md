@@ -55,7 +55,7 @@
 ## Review Focus
 
 1. **A wheel glide in progress when a nav link or the skip link jumps.** Expected: the page lands on the target and stays. Test: Task 3 `smooth-nav-jump`.
-2. **Wheel over the open menu on a short desktop window (1440x400, where the menu overflows).** Expected: the menu scrolls and the page does not move under it. Test: Task 3 `smooth-menu-wheel`.
+2. **Wheel over the open menu on a short desktop window (1440x360, where the menu overflows; at 1440x400 its 292px of content fits the 302px max-height).** Expected: the menu scrolls and the page does not move under it. Test: Task 3 `smooth-menu-wheel`.
 3. **A pinned row whose window turns short (pinned → unpinned).** Expected: the cloud re-anchors and still shows the row's current step. Test: Task 5 `cloud-resize`.
 4. **Home opened deep at `/#experience`.** Expected: the cloud is already settled, with no replay from the sphere. Test: Task 5 extends `scenes-anchor`.
 5. **No WebGL.** Expected: rows step, headings reveal, nav works, a warning is logged, no error. Test: Task 5 `cloud-no-webgl`.
@@ -133,7 +133,7 @@ Decisions 15–18 and the wheel driver of 19 apply. In `global.css` this task ad
 - [ ] Add scenarios to `scripts/shots.mjs`, each with a `step` line:
   - `smooth-wheel` (desktop): `html` has class `lenis`; a real wheel of deltaY 800, with `after` storing `scrollY` two frames later, gives `0 < stored < 800` and `|scrollY - 800| <= 2` after the wait.
   - `smooth-nav-jump` (desktop): a real wheel of deltaY 3000, with `after` clicking the `#about` rail link at once; after 1500ms the hash is `#about` and the About heading is inside the viewport.
-  - `smooth-menu-wheel` (1440x400): `eval` opens the menu and records `scrollY`; first assert the menu overflows (`scrollHeight > clientHeight`, else return an error, since the case would be untested); a real wheel of deltaY 300 at `.menu`; after 800ms `menu.scrollTop > 0` and `scrollY` unchanged.
+  - `smooth-menu-wheel` (1440x360): `eval` opens the menu and records `scrollY`; first assert the menu overflows (`scrollHeight > clientHeight`, else return an error, since the case would be untested); a real wheel of deltaY 300 at `.menu`; after 800ms `menu.scrollTop > 0` and `scrollY` unchanged.
   - `headings-waiting` (desktop, top of page): every `.project-title` and `.section-title` holds `.split-char` elements, the opal title's chars are translated (not at rest), and each heading's accessible text (its `aria-label`, or text when none) equals its original text.
   - `headings-revealed` (desktop, `show('about')`, wait 1500): the About title's `.split-char` elements are at rest (transform `none` or identity matrix).
   - `experience-enter` (desktop): the eval scrolls to Experience and records the first role's `h3` translateY every frame for 1000ms; the check passes when the minimum is below -0.5 (overshoot past rest) and, after the wait, every animated item is at rest with opacity 1.
