@@ -28,6 +28,9 @@
   --fontSizeH3: calc((48 / 16) * 1rem);
   /* page content clears the rail */
   --contentInline: calc(var(--spaceOuter) + var(--railWidth) + var(--spaceL));
+  /* the theme toggle and menu button; they sit 6px out from the outer space so their icons line up with kt_ */
+  --headerButton: 56px;
+  --headerBottom: calc(var(--spaceOuter) - 6px + var(--headerButton));
 }
 
 [data-theme='dark'] {
@@ -200,10 +203,12 @@ body {
     color: var(--textTitle);
   }
 
+  /* beside the label, not over it, since the current link keeps it on */
   &::after {
     content: '';
     position: absolute;
     inset-inline: var(--spaceS);
+    inset-block-end: var(--spaceS);
     block-size: 4px;
     background: var(--accent);
     transform: scaleY(0);
@@ -213,6 +218,14 @@ body {
   &:hover::after {
     transform: scaleY(1);
     transform-origin: top;
+  }
+
+  &[aria-current] {
+    color: var(--textTitle);
+  }
+
+  &[aria-current]::after {
+    transform: scaleY(1);
   }
 }
 
@@ -255,8 +268,7 @@ body {
     content: '';
     position: fixed;
     inset: 0 0 auto;
-    /* down to the theme toggle's bottom edge, the lower of the two */
-    block-size: calc(var(--spaceOuter) - 6px + 56px);
+    block-size: var(--headerBottom);
     z-index: -1;
     background: var(--background);
     pointer-events: none;
@@ -268,21 +280,16 @@ body {
   }
 }
 
-@media (max-width: 696px) and (prefers-reduced-motion: reduce) {
-  .rail::before {
-    transition: background var(--durationM) ease;
-  }
-}
+/* --- theme toggle and menu button ---------------------------------------------------------------- */
 
-/* --- theme toggle ----------------------------------------------------------------------------- */
-
-.theme-toggle {
+.theme-toggle,
+.menu-toggle {
   position: fixed;
   z-index: 32;
   top: calc(var(--spaceOuter) - 6px);
   right: calc(var(--spaceOuter) - 6px);
-  width: 56px;
-  height: 56px;
+  width: var(--headerButton);
+  height: var(--headerButton);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -335,6 +342,94 @@ body {
     stroke-dashoffset: 7;
     opacity: 0;
   }
+}
+
+/* --- menu: phones and short windows, where the rail's links are hidden -------------------------- */
+
+.menu-toggle {
+  right: calc(var(--spaceOuter) - 6px + var(--headerButton));
+  display: none;
+}
+
+@media (max-width: 696px), (max-height: 696px) {
+  .menu-toggle {
+    display: flex;
+  }
+}
+
+.menu-line {
+  stroke: currentColor;
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform var(--durationS) var(--bezierFastoutSlowin);
+}
+
+/* the two lines cross into a close mark while the menu is open */
+.menu-toggle:has(+ .menu:popover-open) .menu-line {
+  &:first-child {
+    transform: translateY(3px) rotate(45deg);
+  }
+
+  &:last-child {
+    transform: translateY(-3px) rotate(-45deg);
+  }
+}
+
+/* a popover, so the browser handles opening, closing on escape or a tap outside, and keeping it above the page.
+   its ua styles centre it in the window; it drops from under the header instead */
+.menu {
+  position: fixed;
+  inset: var(--headerBottom) 0 auto;
+  width: auto;
+  max-height: calc(100svh - var(--headerBottom));
+  margin: 0;
+  padding: var(--spaceM) var(--spaceOuter) var(--spaceXL);
+  overflow: auto;
+  border: 0;
+  /* the page carries on below, so the panel needs an edge where the strip above has none */
+  border-block-end: 1px solid color-mix(in lab, var(--text) 15%, transparent);
+  background: var(--background);
+  color: var(--textBody);
+}
+
+.menu-links {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-link {
+  position: relative;
+  padding: var(--spaceS) var(--spaceL);
+  color: color-mix(in lab, var(--text) 80%, transparent);
+  font-size: calc((24 / 16) * 1rem);
+  font-weight: 500;
+  text-decoration: none;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset-block: var(--spaceS);
+    inset-inline-start: 0;
+    inline-size: 4px;
+    background: var(--accent);
+    transform: scaleY(0);
+  }
+
+  &:hover,
+  &[aria-current] {
+    color: var(--textTitle);
+  }
+
+  &:hover::before,
+  &[aria-current]::before {
+    transform: scaleY(1);
+  }
+}
+
+.menu-icons {
+  display: flex;
+  margin-block-start: var(--spaceM);
 }
 
 /* --- intro ------------------------------------------------------------------------------------ */
@@ -594,6 +689,20 @@ body {
   }
 }
 
+/* off screen until a keyboard user tabs to it, the first stop on every page. translate, not transform, so the
+   button's hover scale still works */
+.skip-link {
+  position: fixed;
+  z-index: 33;
+  top: var(--spaceOuter);
+  left: var(--spaceOuter);
+  translate: 0 calc(-100% - var(--spaceOuter) - var(--spaceS));
+
+  &:focus {
+    translate: none;
+  }
+}
+
 /* --- scroll cue ------------------------------------------------------------------------------- */
 
 @keyframes introScrollIndicator {
@@ -798,6 +907,32 @@ body {
   line-height: 1.1;
   letter-spacing: -0.02em;
   color: var(--textTitle);
+}
+
+/* a nav jump lands with the heading clear of the phone header strip */
+@media (max-width: 696px) {
+  :is(#projects, #experience, #about, #contact) {
+    scroll-margin-top: var(--spaceL);
+  }
+}
+
+/* and a short accent line wipes in and out under the heading it lands on. projects has no visible heading, so the
+   first row's title takes it. under reduced motion nothing draws */
+:target .section-title,
+#projects:target .project:first-of-type .project-title {
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block-start: calc(100% + var(--spaceS));
+    inline-size: var(--space3XL);
+    block-size: 4px;
+    background: var(--accent);
+    transform: scaleX(0);
+    animation: reveal calc(var(--durationL) * 2) var(--bezierFastoutSlowin) var(--durationXS);
+  }
 }
 
 .experience-head {

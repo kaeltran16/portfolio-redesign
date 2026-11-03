@@ -97,8 +97,8 @@ const projectLinksLoad = `Promise.all([...document.querySelectorAll('#projects .
   .then(failed => failed.filter(Boolean).join(', '))`;
 const caseText = 'h1, .project-description, .case-facts dt, .case-facts dd, .case-section h2, .prose p, .case-back, .case-next-label, .case-next-title';
 const pulsesStill = `[...document.querySelectorAll('.db-live i, .arc-pulse')].some(el => getComputedStyle(el).animationName !== 'none') ? 'a console pulse animates under reduced motion' : ''`;
-// joins checks that each return an error string or ''
-const allOf = (...checks) => `[${checks.join(', ')}].filter(Boolean).join('; ')`;
+// joins checks that each return an error string or '', or a promise of one
+const allOf = (...checks) => `Promise.all([${checks.join(', ')}]).then(errors => errors.filter(Boolean).join('; '))`;
 const noScene = `document.querySelector('.scene, [data-at]') ? 'page renders scene markup' : ''`;
 // returns an error string unless the phone header strip is filled or clear as asked. a filled strip must match the
 // page background, span the width and reach below kt_ and the toggle, with the page's title scrolled under it
@@ -111,7 +111,7 @@ const headerBar = filled => `(() => {
   const page = getComputedStyle(document.body).backgroundColor;
   if (bar.backgroundColor !== page) return 'header strip is ' + bar.backgroundColor + ', the page is ' + page;
   if (parseFloat(bar.width) < innerWidth) return 'header strip is ' + bar.width + ' wide, the screen ' + innerWidth + 'px';
-  const lowest = Math.max(...['.monogram .mark', '.theme-toggle'].map(s => document.querySelector(s).getBoundingClientRect().bottom));
+  const lowest = Math.max(...['.monogram .mark', '.theme-toggle', '.menu-toggle'].map(s => document.querySelector(s).getBoundingClientRect().bottom));
   if (parseFloat(bar.height) < lowest) return 'header strip ends at ' + bar.height + ', above the header at ' + lowest + 'px';
   const title = document.querySelector('.project-title').getBoundingClientRect();
   return title.top < parseFloat(bar.height) ? '' : 'no title under the header strip, so the overlap is untested';
@@ -334,6 +334,94 @@ const rolesAre = want => `(() => {
 })()`;
 const drawing = on => `document.querySelector('.experience-list').hasAttribute('data-drawing') === ${on} ? '' : 'timeline ${on ? 'does not draw' : 'draws'}'`;
 
+// --- nav: each check returns an error string or ''
+const NAV_IDS = ['projects', 'experience', 'about', 'contact'];
+const navKit = `
+  const errors = [];
+  const marked = selector => [...document.querySelectorAll(selector + '[aria-current]')].map(a => a.hash).join() || 'nothing';
+  const expectMarked = (where, want) => ['.rail-link', '.menu-link'].forEach(selector => {
+    if (marked(selector) !== want) errors.push(where + ': ' + selector + ' marks ' + marked(selector) + ', expected ' + want);
+  });
+  // the heading a jump lands on; projects has no visible one, so its first row's title
+  const headingOf = id => document.querySelector('#' + id + ' .section-title') ?? document.querySelector('#' + id + ' .project:first-of-type .project-title');
+`;
+const navCurrent = `(async () => {
+  ${navKit}
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  await ${frames};
+  expectMarked('top of the page', 'nothing');
+  for (const id of ${JSON.stringify(NAV_IDS.slice(0, -1))}) {
+    document.getElementById(id).scrollIntoView({ behavior: 'instant' });
+    await ${frames};
+    expectMarked('#' + id + ' in view', '#' + id);
+  }
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+  await ${frames};
+  expectMarked('end of the page', '#contact');
+  return errors.join('; ');
+})()`;
+// clicks each link, through the menu when asked, and checks the jump: hash and :target set, no history stop added,
+// the heading on screen and below the header, its cue wiping in
+const navJumps = viaMenu => `(async () => {
+  ${navKit}
+  const start = history.length;
+  const menu = document.querySelector('.menu');
+  const headerBottom = parseFloat(getComputedStyle(document.querySelector('.rail'), '::before').height) || 0;
+  for (const id of ${JSON.stringify(NAV_IDS)}) {
+    if (${viaMenu}) {
+      document.querySelector('.menu-toggle').click();
+      if (!menu.matches(':popover-open')) errors.push('menu does not open from its button');
+    }
+    document.querySelector('${viaMenu ? '.menu-link' : '.rail-link'}[href$="#' + id + '"]').click();
+    await ${frames};
+    if (menu.matches(':popover-open')) errors.push('menu stays open after its ' + id + ' link');
+    if (location.hash !== '#' + id || !document.getElementById(id).matches(':target')) errors.push(id + ' is not the target after its link: hash ' + location.hash);
+    const heading = headingOf(id).getBoundingClientRect();
+    const top = ${viaMenu} ? headerBottom : 0;
+    if (heading.top < top || heading.bottom > innerHeight) errors.push(id + ' heading lands at ' + Math.round(heading.top) + 'px, outside ' + Math.round(top) + '-' + innerHeight + 'px');
+    const cue = getComputedStyle(headingOf(id), '::after').animationName;
+    if (cue !== 'reveal') errors.push(id + ' heading cue is ' + cue);
+  }
+  if (history.length !== start) errors.push('nav clicks added ' + (history.length - start) + ' history entries');
+  // the screenshot follows the check, so let the strip and scroll cue finish their fades
+  await new Promise(r => setTimeout(r, 1000));
+  return errors.join('; ');
+})()`;
+const openMenu = "document.querySelector('.menu-toggle').click()";
+const menuOpen = `(() => {
+  const menu = document.querySelector('.menu');
+  if (!menu.matches(':popover-open')) return 'menu is not open';
+  const top = menu.getBoundingClientRect().top;
+  const strip = parseFloat(getComputedStyle(document.querySelector('.rail'), '::before').height);
+  if (Math.abs(top - strip) > 0.5) return 'menu starts at ' + top + 'px, not under the header strip at ' + strip + 'px';
+  const off = [...menu.querySelectorAll('a')].find(a => a.getBoundingClientRect().bottom > innerHeight || a.getBoundingClientRect().right > innerWidth);
+  return off ? 'menu link off screen: ' + (off.textContent.trim() || off.getAttribute('aria-label')) : '';
+})()`;
+const menuShown = shown => `(() => {
+  const toggle = getComputedStyle(document.querySelector('.menu-toggle')).display !== 'none';
+  const rail = getComputedStyle(document.querySelector('.rail-nav')).display !== 'none';
+  if (toggle !== ${shown}) return 'menu button ${shown ? 'hidden' : 'shown'} at ' + innerWidth + 'x' + innerHeight;
+  if (rail === ${shown}) return 'rail links ${shown ? 'shown' : 'hidden'} at ' + innerWidth + 'x' + innerHeight;
+  return '';
+})()`;
+const skipLink = `(() => {
+  const skip = document.querySelector('.skip-link');
+  if (document.querySelector('a[href], button') !== skip) return 'skip link is not the first stop';
+  if (skip.getBoundingClientRect().bottom > 0) return 'skip link shows before it has focus';
+  skip.focus();
+  const r = skip.getBoundingClientRect();
+  if (r.top < 0 || r.bottom > innerHeight) return 'focused skip link is off screen at ' + Math.round(r.top) + 'px';
+  return document.getElementById(new URL(skip.href).hash.slice(1))?.tagName === 'MAIN' ? '' : 'skip link does not target main';
+})()`;
+// on a case page the links go to Home: the click is left to the browser and no link is current
+const caseNavPlain = `(() => {
+  let prevented;
+  window.addEventListener('click', e => { prevented = e.defaultPrevented; e.preventDefault(); }, { once: true });
+  document.querySelector('.rail-link').click();
+  if (prevented !== false) return 'case page rail link click was taken over';
+  return document.querySelector('[aria-current]') ? 'a link is current on a case page' : '';
+})()`;
+
 const SCENARIOS = [
   { name: 'desktop', viewport: desktop, waitMs: 7000, check: titleFits },
   // role words change every 5s; 6.2s lands inside the wipe of the second word
@@ -374,6 +462,39 @@ const SCENARIOS = [
     step: `${page || 'home'} scrolled on a 390px phone, ${light ? 'light' : 'dark'}: a title under the header, covered by a full-width strip in the page background below kt_ and the toggle`,
   })),
   { name: 'header-desktop-scrolled', viewport: desktop, waitMs: 500, eval: showTitle, check: noHeaderBar, step: 'scrolled at 1440px: no header strip' },
+  { name: 'nav-current', viewport: desktop, waitMs: 1000, check: navCurrent, step: 'scrolling to each section marks only its rail and menu link current, none at the top, contact at the end' },
+  { name: 'nav-jumps', viewport: desktop, waitMs: 1000, check: navJumps(false), step: 'each rail link jumps to its section: target set, heading on screen with its cue, no history entries added' },
+  {
+    name: 'nav-cue-reduced-motion',
+    viewport: desktop,
+    page: '#about',
+    waitMs: 500,
+    reduced: true,
+    check: `getComputedStyle(document.querySelector('#about .section-title'), '::after').animationName === 'none' ? '' : 'arrival cue animates under reduced motion'`,
+    step: 'opened at /#about under reduced motion: no arrival cue',
+  },
+  { name: 'nav-case-page', viewport: desktop, page: 'projects/arc', waitMs: 500, check: caseNavPlain, step: 'case page: rail links are plain links to Home, none current' },
+  { name: 'skip-link', viewport: desktop, waitMs: 500, check: skipLink, step: 'skip link is the first stop, hidden until focused, on screen when focused, targets main' },
+  { name: 'menu-desktop', viewport: desktop, waitMs: 500, check: menuShown(false), step: 'at 1440x900: rail links shown, no menu button' },
+  { name: 'menu-short-window', viewport: { ...desktop, height: 650 }, waitMs: 500, check: menuShown(true), step: 'at 1440x650: rail links hidden, menu button shown' },
+  {
+    name: 'menu-phone-jumps',
+    viewport: phone,
+    waitMs: 1000,
+    check: allOf(menuShown(true), navJumps(true)),
+    step: 'each menu link on a 390px phone opens from the button, closes on the tap and jumps: heading below the header strip, no history entries added',
+  },
+  ...[
+    ['menu-phone-open', false],
+    ['menu-phone-open-light', true],
+  ].map(([name, light]) => ({
+    name,
+    viewport: phone,
+    waitMs: 800,
+    eval: light ? `${toggleTheme}; ${showTitle}; ${openMenu}` : `${showTitle}; ${openMenu}`,
+    check: allOf(menuOpen, readable('.menu', '.menu-link')),
+    step: `menu open on a 390px phone, ${light ? 'light' : 'dark'}: under the header strip, every link on screen, text at 4.5:1 or more`,
+  })),
   ...sceneScenarios,
   ...opalScenarios,
   ...steadyScenarios,

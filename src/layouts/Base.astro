@@ -24,6 +24,8 @@ const { title, description } = Astro.props as { title: string; description: stri
     </script>
   </head>
   <body>
+    <a class="button skip-link" href="#content">Skip to content</a>
+
     <header class="rail">
       <a class="monogram" href="/#intro" aria-label={`${name}, ${role} developer`}>
         <svg aria-hidden="true" class="mark" width="48" height="29" viewBox="0 0 48 29">
@@ -32,7 +34,7 @@ const { title, description } = Astro.props as { title: string; description: stri
       </a>
       <nav class="rail-nav" aria-label="Main">
         <div class="rail-links">
-          {nav.map(label => <a class="rail-link" href={`/#${label.toLowerCase()}`}>{label}</a>)}
+          {nav.map(label => <a class="rail-link" href={`/#${label.toLowerCase()}`} data-nav-link>{label}</a>)}
         </div>
         <div class="rail-icons">
           {
@@ -59,15 +61,29 @@ const { title, description } = Astro.props as { title: string; description: stri
       </svg>
     </button>
 
+    <button class="menu-toggle" type="button" aria-label="Menu" popovertarget="menu">
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24"><path class="menu-line" d="M4 9h16" /><path class="menu-line" d="M4 15h16" /></svg>
+    </button>
+    <nav class="menu" id="menu" popover aria-label="Main" data-nav-menu>
+      <div class="menu-links">
+        {nav.map(label => <a class="menu-link" href={`/#${label.toLowerCase()}`} data-nav-link>{label}</a>)}
+      </div>
+      <div class="menu-icons">
+        {
+          social.map(({ label, href, path }) => (
+            <a class="rail-icon" href={href} aria-label={label} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer">
+              <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24"><path d={path} /></svg>
+            </a>
+          ))
+        }
+      </div>
+    </nav>
+
     <slot />
 
     <script>
       import '../scripts/theme';
-
-      // the phone header bar fills in once the page leaves the top
-      const markScrolled = () => (document.documentElement.dataset.scrolled = String(window.scrollY > 0));
-      window.addEventListener('scroll', markScrolled, { passive: true });
-      markScrolled();
+      import '../scripts/nav';
     </script>
   </body>
 </html>
