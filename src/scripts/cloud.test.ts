@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as scene from '../lib/scene';
 import * as shapes from '../lib/shapes';
-import { boxTransform, startCloud } from './cloud';
+import { boxTransform, CLOUD_SPREAD, startCloud } from './cloud';
 
 const options = {
   theme: 'dark' as const,
@@ -29,6 +29,11 @@ describe('boxTransform', () => {
     const box = boxTransform({ left: 10, top: 20, width: 0, height: 0 }, 1.6);
     expect(box).toEqual({ x: 10, y: 20, scale: 0 });
     expect(Object.values(box).some(Number.isNaN)).toBe(false);
+  });
+
+  // a siem shape inside 1 / spread is drawn under the opaque console
+  it('keeps the halo beyond the visual it is drawn behind', () => {
+    expect(shapes.HALO_INNER).toBeGreaterThan(1 / CLOUD_SPREAD);
   });
 });
 

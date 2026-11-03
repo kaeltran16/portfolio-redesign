@@ -249,7 +249,15 @@ const hitsText = selector => `(() => {
 const cloudInRow = (n, slug, k, text = '.project-title') => allOf(cloudShows(`${slug}-${k}`), hitsText(`${row(n)} ${text}`));
 const CAPTIONS = '.scene-captions';
 // share of the screenshot the cloud must change for these scenes to count as showing it
-const CLOUD_SEEN = { 'scene-arc-2': 0.002, 'scene-siem-3-light': 0.002, 'scene-opal-2-phone-390': 0.002 };
+const CLOUD_SEEN = {
+  'scene-arc-2': 0.002,
+  'scene-siem-3': 0.001,
+  'scene-siem-4': 0.001,
+  'scene-siem-5': 0.001,
+  'scene-siem-6': 0.001,
+  'scene-siem-3-light': 0.002,
+  'scene-opal-2-phone-390': 0.002,
+};
 
 // the consoles keep their own dark palette in both themes, like a screenshot, so only the captions are checked
 const sceneText = '.scene-captions li span';
@@ -671,7 +679,8 @@ const SCENARIOS = [
       if (caption && box.bottom > caption.top + 0.5) return 'box overlaps the step caption';
       return box.bottom > text.top + 0.5 ? 'box overlaps the row text' : '';
     })()`),
-    step: 'siem scene scrolled to step 2 on a 390px phone: not pinned, only the risk panel shows, the console inside its box and the width, above the caption and the row text, the cloud on siem-2 beneath the caption',
+    cloudVisible: 0.001,
+    step: 'siem scene scrolled to step 2 on a 390px phone: not pinned, only the risk panel shows, the console inside its box and the width, above the caption and the row text, the cloud on siem-2 beneath the caption and visible',
   },
   {
     name: 'scenes-phone-390',

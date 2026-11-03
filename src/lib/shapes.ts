@@ -12,6 +12,8 @@ type Part = (random: Random) => [x: number, y: number];
 const DEFAULT_SEED = 1;
 // keeps flat shapes from reading as paper cut-outs when the camera tilts
 const DEPTH = 0.15;
+// depth of a part that comes toward the viewer, which also draws its dots larger
+const FORWARD = 0.6;
 // 1 in 25 is 4%, inside the cv's 3-5% left after its 95-97% triage cut
 const SURVIVOR_EVERY = 25;
 const OUTLIER_EVERY = 100;
@@ -111,7 +113,7 @@ function ask(i: number, random: Random): Point {
   if (i % LANES.length !== ASK_LANE) return lane(i, random);
   const [x, y] = askBlob(random);
   // the question comes forward, out of its lane
-  return [x, y, 0.6 + spread(random, DEPTH), 1];
+  return [x, y, FORWARD + spread(random, DEPTH), 1];
 }
 
 // lanes converge over the top half and run as one trunk below it
@@ -121,9 +123,18 @@ function merge(i: number, random: Random): Point {
   return [x, y, spread(random, DEPTH), 1];
 }
 
+// a shape is drawn behind its row's visual, and the opaque siem console covers shape space out to
+// 1 / CLOUD_SPREAD on the box's shorter axis; beyond this a point shows, with margin for dot size and drift
+export const HALO_INNER = 0.7;
+// the band above the console: below it sits the step caption, and a phone cuts off the sides
+const HALO_MID = 0.85;
+// the answer ring frames the console; at this radius its diagonals (radius / sqrt 2) still clear HALO_INNER
+const ANSWER_RADIUS = 1;
+
 // siem: survivors are fixed by index, so the triage cut keeps the particles that were
 // already the outlier and the chain
-const SIEM_CLUSTERS: [number, number][] = [[-0.7, 0.4], [-0.3, -0.45], [0.1, 0.35], [0.5, -0.3], [0.75, 0.5]];
+const SIEM_CLUSTERS: [number, number][] = [[-0.7, 0.82], [-0.35, 0.92], [0, 0.82], [0.35, 0.92], [0.7, 0.82]];
+const CLUSTER_RADIUS = 0.08;
 
 function stream(random: Random, noise: number): Point {
   const x = spread(random, 1);
@@ -132,30 +143,31 @@ function stream(random: Random, noise: number): Point {
 
 const events: Place = (_, random) => stream(random, 0.45);
 
-const outlier = blob(0.6, 0.75, 0.08);
+const outlier = blob(0.6, HALO_MID, 0.08);
 const risk: Place = (i, random) => {
   if (i % OUTLIER_EVERY !== 0) return stream(random, 0.2);
   const [x, y] = outlier(random);
   return [x, y, spread(random, DEPTH), 1];
 };
 
-const intel = parts(...SIEM_CLUSTERS.map(([x, y]) => blob(x, y, 0.18)));
+const intel = parts(...SIEM_CLUSTERS.map(([x, y]) => blob(x, y, CLUSTER_RADIUS)));
 
 const chainLinks = SIEM_CLUSTERS.slice(1).map(([x, y], k) => segment(...SIEM_CLUSTERS[k], x, y));
-const chainNodes = parts(...SIEM_CLUSTERS.map(([x, y]) => blob(x, y, 0.12)), ...chainLinks);
+const chainNodes = parts(...SIEM_CLUSTERS.map(([x, y]) => blob(x, y, CLUSTER_RADIUS * 0.75)), ...chainLinks);
 const chainOnly = parts(...chainLinks);
 const chain: Place = (i, random, previous) =>
   isSurvivor(i) ? chainOnly(i, random, previous) : chainNodes(i, random, previous);
 
-// the rest fade out where they stood while the survivors gather
-const gathered = blob(0, 0, 0.2);
+// the rest fade out where they stood while the survivors gather and come forward to the analyst,
+// which also keeps so few dots large enough to read
+const gathered = blob(0, HALO_MID, 0.14);
 const alerts: Place = (i, random, previous) => {
   if (!isSurvivor(i)) return kept(previous, i);
   const [x, y] = gathered(random);
-  return [x, y, spread(random, DEPTH), 1];
+  return [x, y, FORWARD + spread(random, DEPTH), 1];
 };
 
-const answer = ring(0, 0, 0.45);
+const answer = ring(0, 0, ANSWER_RADIUS);
 const agent: Place = (i, random, previous) => {
   if (!isSurvivor(i)) return kept(previous, i);
   const [x, y] = answer(random);

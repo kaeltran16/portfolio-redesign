@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTrack } from './shapes';
+import { buildTrack, HALO_INNER } from './shapes';
 
 const ROWS = [
   { slug: 'arc', steps: 4 },
@@ -26,6 +26,10 @@ function largestGap(values: number[]): number {
   let gap = 0;
   for (let i = 1; i < sorted.length; i++) gap = Math.max(gap, sorted[i] - sorted[i - 1]);
   return gap;
+}
+
+function inHalo(shape: Float32Array, i: number): boolean {
+  return Math.max(Math.abs(shape[i * 4]), Math.abs(shape[i * 4 + 1])) >= HALO_INNER;
 }
 
 function xs(shape: Float32Array): number[] {
@@ -75,6 +79,19 @@ describe('buildTrack', () => {
     for (const step of [1, 2, 3, 4]) {
       expect(presentIndices(shapeOf(`siem-${step}`, siem))).toHaveLength(count);
     }
+  });
+
+  it('places the siem survivors in the halo, clear of the visual', () => {
+    for (const step of [5, 6]) {
+      const shape = shapeOf(`siem-${step}`);
+      for (const i of presentIndices(shape)) expect(inHalo(shape, i)).toBe(true);
+    }
+  });
+
+  it('places the siem clusters in the halo', () => {
+    const shape = shapeOf('siem-3');
+    const outside = presentIndices(shape).filter(i => inHalo(shape, i));
+    expect(outside.length / COUNT).toBeGreaterThanOrEqual(0.8);
   });
 
   it('splits arc workers into lanes and merges them into one trunk', () => {
