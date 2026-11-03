@@ -422,6 +422,41 @@ const caseNavPlain = `(() => {
   return document.querySelector('[aria-current]') ? 'a link is current on a case page' : '';
 })()`;
 
+// --- motion: smooth scroll, split headings, experience entrances
+const HEADINGS = '.project-title, .section-title';
+const ROLE_ITEMS = '.experience-dates, .experience-body h3, .experience-company, .experience-body li';
+const motionKit = `
+  const atRest = el => { const t = getComputedStyle(el).transform; return t === 'none' || new DOMMatrix(t).isIdentity; };
+`;
+// returns an error string unless every heading is split, opal's letters wait below their line, and each heading's
+// accessible text is its text as served
+const headingsWaiting = `(async () => {
+  ${motionKit}
+  const served = new DOMParser().parseFromString(await (await fetch(location.href)).text(), 'text/html');
+  const headings = [...document.querySelectorAll('${HEADINGS}')];
+  const errors = [];
+  if (headings.length !== served.querySelectorAll('${HEADINGS}').length) errors.push('found ' + headings.length + ' headings, the page serves ' + served.querySelectorAll('${HEADINGS}').length);
+  for (const h of headings) {
+    if (!h.querySelector('.split-char')) errors.push('#' + h.id + ' is not split');
+    const want = served.getElementById(h.id).textContent.trim();
+    const name = h.getAttribute('aria-label') ?? h.textContent.trim();
+    if (name !== want) errors.push('#' + h.id + ' reads "' + name + '", not "' + want + '"');
+  }
+  const opal = [...document.querySelectorAll('#project-opal .split-char')];
+  if (!opal.length || opal.some(atRest)) errors.push('opal title letters are at rest before it is in view');
+  return errors.join('; ');
+})()`;
+// scrolls to Experience once the entrances are set up, and records the first role's title offset every frame for 1s
+const watchEntrance = `(async () => {
+  for (let i = 0; i < 180 && !document.querySelector('.split-char'); i++) await ${frames};
+  const title = document.querySelector('.experience-role h3');
+  ${showExperience};
+  window.lowest = Infinity;
+  for (const end = performance.now() + 1000; performance.now() < end; await new Promise(r => requestAnimationFrame(r))) {
+    window.lowest = Math.min(window.lowest, new DOMMatrix(getComputedStyle(title).transform).m42);
+  }
+})()`;
+
 const SCENARIOS = [
   { name: 'desktop', viewport: desktop, waitMs: 7000, check: titleFits },
   // role words change every 5s; 6.2s lands inside the wipe of the second word
@@ -752,7 +787,110 @@ const SCENARIOS = [
     clip: '#experience',
     step: 'experience timeline under reduced motion: not drawing, every marker filled, the whole line accent',
   },
+  {
+    name: 'smooth-wheel',
+    viewport: desktop,
+    waitMs: 1500,
+    wheel: { deltaY: 800 },
+    after: `${frames}.then(() => (window.glided = scrollY))`,
+    check: `(() => {
+      if (!document.documentElement.classList.contains('lenis')) return 'html has no lenis class';
+      if (!(window.glided > 0 && window.glided < 800)) return 'two frames after the wheel the page was at ' + window.glided + ', not part way to 800';
+      return Math.abs(scrollY - 800) <= 2 ? '' : 'the glide settled at ' + scrollY + ', not 800';
+    })()`,
+    step: 'a real 800px wheel at 1440px: the page glides, part way two frames in, at 800 once settled',
+  },
+  {
+    name: 'smooth-nav-jump',
+    viewport: desktop,
+    waitMs: 1500,
+    wheel: { deltaY: 3000 },
+    after: `document.querySelector('.rail-link[href$="#about"]').click()`,
+    check: `(() => {
+      if (location.hash !== '#about') return 'hash is ' + location.hash + ', not #about';
+      const r = document.querySelector('#about .section-title').getBoundingClientRect();
+      return r.top >= 0 && r.bottom <= innerHeight ? '' : 'about heading at ' + Math.round(r.top) + 'px, outside the viewport';
+    })()`,
+    step: 'the about rail link clicked during a 3000px wheel glide: the page lands on about and stays',
+  },
+  {
+    name: 'smooth-menu-wheel',
+    // the menu's 292px of content overflows only below ~391px tall at this width
+    viewport: { ...desktop, height: 360 },
+    waitMs: 800,
+    eval: `${openMenu}; window.startY = scrollY`,
+    wheel: { at: '.menu', deltaY: 300 },
+    check: `(() => {
+      const menu = document.querySelector('.menu');
+      if (menu.scrollHeight <= menu.clientHeight) return 'menu content (' + menu.scrollHeight + 'px) fits its ' + menu.clientHeight + 'px at ' + innerWidth + 'x' + innerHeight + ', so a wheel over it is untested';
+      if (!menu.matches(':popover-open')) return 'menu is not open';
+      if (menu.scrollTop <= 0) return 'menu did not scroll under the wheel';
+      return scrollY === window.startY ? '' : 'the page moved from ' + window.startY + ' to ' + scrollY + ' under the menu';
+    })()`,
+    step: 'a 300px wheel over the open menu at 1440x360, where it overflows: the menu scrolls, the page stays',
+  },
+  {
+    name: 'headings-waiting',
+    viewport: desktop,
+    waitMs: 1500,
+    check: headingsWaiting,
+    step: 'top of the page at 1440px: every project and section heading split into letters, opal’s waiting below its line, each heading read by its own text',
+  },
+  {
+    name: 'headings-revealed',
+    viewport: desktop,
+    waitMs: 1500,
+    eval: show('about'),
+    check: `(() => {
+      ${motionKit}
+      const chars = [...document.querySelectorAll('#about .section-title .split-char')];
+      if (!chars.length) return 'about title is not split';
+      const moving = chars.filter(c => !atRest(c));
+      return moving.length ? moving.length + ' about title letters are not at rest' : '';
+    })()`,
+    step: 'about scrolled into view: its title letters have risen to rest',
+  },
+  {
+    name: 'experience-enter',
+    viewport: desktop,
+    waitMs: 1000,
+    eval: watchEntrance,
+    check: `(() => {
+      ${motionKit}
+      const errors = [];
+      if (!(window.lowest < -0.5)) errors.push('first role title went no higher than ' + window.lowest + 'px, so it did not overshoot');
+      const entered = [...document.querySelectorAll('.experience-role')].filter(role => role.getBoundingClientRect().top < innerHeight);
+      const items = entered.flatMap(role => [...role.querySelectorAll('${ROLE_ITEMS}')]);
+      if (!items.length) errors.push('no role entered the viewport');
+      const unsettled = items.filter(el => !atRest(el) || getComputedStyle(el).opacity !== '1');
+      if (unsettled.length) errors.push(unsettled.length + ' entered role items are not at rest and opaque');
+      return errors.join('; ');
+    })()`,
+    clip: '#experience',
+    step: 'experience scrolled into view: the first role springs in past its rest and settles within a second, every item opaque',
+  },
+  {
+    name: 'motion-reduced',
+    viewport: desktop,
+    waitMs: 1000,
+    reduced: true,
+    eval: showExperience,
+    check: `(() => {
+      const errors = [];
+      if (document.documentElement.classList.contains('lenis')) errors.push('smooth scroll is on');
+      if (document.querySelector('.split-char')) errors.push('a heading is split');
+      const styled = [...document.querySelectorAll('${ROLE_ITEMS}')].filter(el => el.style.transform || el.style.opacity);
+      if (styled.length) errors.push(styled.length + ' experience items carry an inline transform or opacity');
+      return errors.join('; ');
+    })()`,
+    step: 'experience under reduced motion: no smooth scroll, no split headings, no entrance styles',
+  },
 ];
+// the viewport point at the centre of a selector, or of the viewport with none
+const centreOf = selector => `(() => {
+  const r = ${selector ? `document.querySelector('${selector}').getBoundingClientRect()` : '{ left: 0, top: 0, width: innerWidth, height: innerHeight }'};
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+})()`;
 // the page-space rect of a selector, for a screenshot of a section taller than the viewport
 const clipOf = selector => `(() => {
   const r = document.querySelector('${selector}').getBoundingClientRect();
@@ -836,6 +974,16 @@ try {
     if (s.eval) {
       const { exceptionDetails } = await send('Runtime.evaluate', { expression: s.eval, awaitPromise: true }, sessionId);
       if (exceptionDetails) errors.push(`${s.name}: eval threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
+    }
+    // a real wheel through the input pipeline: a synthetic WheelEvent never scrolls anything natively.
+    // `after` runs at once, to act while the scroll it starts is still under way
+    if (s.wheel) {
+      const { result } = await send('Runtime.evaluate', { expression: centreOf(s.wheel.at), returnByValue: true }, sessionId);
+      await send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...result.value, deltaX: 0, deltaY: s.wheel.deltaY }, sessionId);
+      if (s.after) {
+        const { exceptionDetails } = await send('Runtime.evaluate', { expression: s.after, awaitPromise: true }, sessionId);
+        if (exceptionDetails) errors.push(`${s.name}: after threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
+      }
     }
     // a window resized mid-scenario, after the eval has set up the state before it
     if (s.resize) await send('Emulation.setDeviceMetricsOverride', s.resize, sessionId);

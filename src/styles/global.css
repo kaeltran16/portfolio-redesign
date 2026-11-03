@@ -386,6 +386,8 @@ body {
   margin: 0;
   padding: var(--spaceM) var(--spaceOuter) var(--spaceXL);
   overflow: auto;
+  /* a wheel at the menu's ends stays in the menu instead of chaining to the page under it */
+  overscroll-behavior: contain;
   border: 0;
   /* the page carries on below, so the panel needs an edge where the strip above has none */
   border-block-end: 1px solid color-mix(in lab, var(--text) 15%, transparent);

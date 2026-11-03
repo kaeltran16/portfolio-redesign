@@ -1,5 +1,8 @@
 import { canPin, fillFraction, pinProgress, READING_LINE, revealProgress, stepAt } from '../lib/scene';
 import { decode } from './decoder';
+import { reduceMotion } from './motion';
+import './reveal';
+import './smooth';
 import type { Sphere, Theme } from './sphere';
 
 // timings from hamishw.com's intro.jsx: words cycle every 5s, enter over 3s, exit over 2s
@@ -8,7 +11,6 @@ const ENTER_MS = 3000;
 const EXIT_MS = 2000;
 const NAME_DECODE_DELAY = 500;
 
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const root = document.documentElement;
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 
