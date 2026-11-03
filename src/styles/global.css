@@ -248,6 +248,32 @@ body {
   }
 }
 
+/* on phones content runs the full width, so text would scroll under kt_ and the toggle; a strip behind both hides
+   it. clear at the top so the intro stays whole, and always on without js */
+@media (max-width: 696px) {
+  .rail::before {
+    content: '';
+    position: fixed;
+    inset: 0 0 auto;
+    /* down to the theme toggle's bottom edge, the lower of the two */
+    block-size: calc(var(--spaceOuter) - 6px + 56px);
+    z-index: -1;
+    background: var(--background);
+    pointer-events: none;
+    transition: opacity var(--durationM) ease, background var(--durationM) ease;
+  }
+
+  .js:not([data-scrolled='true']) .rail::before {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 696px) and (prefers-reduced-motion: reduce) {
+  .rail::before {
+    transition: background var(--durationM) ease;
+  }
+}
+
 /* --- theme toggle ----------------------------------------------------------------------------- */
 
 .theme-toggle {

@@ -100,6 +100,23 @@ const pulsesStill = `[...document.querySelectorAll('.db-live i, .arc-pulse')].so
 // joins checks that each return an error string or ''
 const allOf = (...checks) => `[${checks.join(', ')}].filter(Boolean).join('; ')`;
 const noScene = `document.querySelector('.scene, [data-at]') ? 'page renders scene markup' : ''`;
+// returns an error string unless the phone header strip is filled or clear as asked. a filled strip must match the
+// page background, span the width and reach below kt_ and the toggle, with the page's title scrolled under it
+const showTitle = "document.querySelector('.project-title').scrollIntoView()";
+const headerBar = filled => `(() => {
+  const bar = getComputedStyle(document.querySelector('.rail'), '::before');
+  if (bar.content === 'none') return 'no header strip';
+  if (Number(bar.opacity) !== ${filled ? 1 : 0}) return 'header strip opacity is ' + bar.opacity + ', expected ${filled ? 1 : 0}';
+  if (!${filled}) return '';
+  const page = getComputedStyle(document.body).backgroundColor;
+  if (bar.backgroundColor !== page) return 'header strip is ' + bar.backgroundColor + ', the page is ' + page;
+  if (parseFloat(bar.width) < innerWidth) return 'header strip is ' + bar.width + ' wide, the screen ' + innerWidth + 'px';
+  const lowest = Math.max(...['.monogram .mark', '.theme-toggle'].map(s => document.querySelector(s).getBoundingClientRect().bottom));
+  if (parseFloat(bar.height) < lowest) return 'header strip ends at ' + bar.height + ', above the header at ' + lowest + 'px';
+  const title = document.querySelector('.project-title').getBoundingClientRect();
+  return title.top < parseFloat(bar.height) ? '' : 'no title under the header strip, so the overlap is untested';
+})()`;
+const noHeaderBar = `getComputedStyle(document.querySelector('.rail'), '::before').content === 'none' ? '' : 'header strip drawn on desktop'`;
 
 // --- scroll scenes: the row's data-step picks the step, each element's data-at is the step it lights in
 const row = n => `#projects .project:nth-of-type(${n})`;
@@ -342,6 +359,21 @@ const SCENARIOS = [
     clip: '.case',
     step: `${slug} case study at ${viewport.width}px, ${light ? 'light' : 'dark'}: fits the width, text at 4.5:1 or more, the finished visual with no scene`,
   }))),
+  { name: 'header-phone-top', viewport: phone, waitMs: 1000, check: headerBar(false), step: 'top of the page on a 390px phone: header strip clear, the intro whole' },
+  ...[
+    ['header-phone-scrolled', '', false],
+    ['header-phone-scrolled-light', '', true],
+    ['header-case-phone-scrolled', 'projects/arc', false],
+  ].map(([name, page, light]) => ({
+    name,
+    viewport: phone,
+    page,
+    waitMs: 1000,
+    eval: light ? `${toggleTheme}; ${showTitle}` : showTitle,
+    check: headerBar(true),
+    step: `${page || 'home'} scrolled on a 390px phone, ${light ? 'light' : 'dark'}: a title under the header, covered by a full-width strip in the page background below kt_ and the toggle`,
+  })),
+  { name: 'header-desktop-scrolled', viewport: desktop, waitMs: 500, eval: showTitle, check: noHeaderBar, step: 'scrolled at 1440px: no header strip' },
   ...sceneScenarios,
   ...opalScenarios,
   ...steadyScenarios,

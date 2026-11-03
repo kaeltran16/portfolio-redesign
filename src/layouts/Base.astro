@@ -63,6 +63,11 @@ const { title, description } = Astro.props as { title: string; description: stri
 
     <script>
       import '../scripts/theme';
+
+      // the phone header bar fills in once the page leaves the top
+      const markScrolled = () => (document.documentElement.dataset.scrolled = String(window.scrollY > 0));
+      window.addEventListener('scroll', markScrolled, { passive: true });
+      markScrolled();
     </script>
   </body>
 </html>
