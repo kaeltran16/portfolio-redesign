@@ -37,10 +37,6 @@ function spread(random: Random, half: number): number {
   return (random() * 2 - 1) * half;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
 const blob = (cx: number, cy: number, radius: number): Part => random => {
   const angle = random() * Math.PI * 2;
   const r = radius * Math.sqrt(random());
@@ -215,8 +211,7 @@ function placeFor(slug: string, step: number): Place {
 function fill(count: number, place: (i: number) => Point): Float32Array {
   const shape = new Float32Array(count * 4);
   for (let i = 0; i < count; i++) {
-    const [x, y, z, presence] = place(i);
-    shape.set([clamp(x, -1, 1), clamp(y, -1, 1), clamp(z, -1, 1), clamp(presence, 0, 1)], i * 4);
+    shape.set(place(i), i * 4);
   }
   return shape;
 }
