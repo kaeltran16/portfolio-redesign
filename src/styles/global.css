@@ -94,12 +94,17 @@ body {
   margin: 0;
   font-family: var(--fontStack);
   font-weight: 400;
-  background-color: var(--background);
   color: var(--textBody);
-  transition: background var(--durationM) ease;
   /* clip, not hidden: hidden makes body a scroll container that never scrolls, so the pinned rows could not stick */
   overflow-x: clip;
   -webkit-font-smoothing: antialiased;
+}
+
+/* body only: with no root background, body's moves to the viewport, beneath the fixed cloud at z-index -1. with
+   one on html as well, body would paint its own box over the cloud */
+body {
+  background-color: var(--background);
+  transition: background var(--durationM) ease;
 }
 
 :focus-visible {
@@ -449,12 +454,14 @@ body {
   overflow: hidden;
 }
 
-.sphere {
-  position: absolute;
+/* beneath every piece of content, so the cloud is never drawn over text */
+.cloud {
+  position: fixed;
   inset: 0;
-  width: 100vw;
-  /* the sphere renders 30% taller than the viewport, as in the original */
-  height: 130%;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
   opacity: 0;
   transition: opacity 3s var(--bezierFastoutSlowin);
 

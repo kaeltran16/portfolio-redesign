@@ -45,10 +45,9 @@ const contactPitch = 'Open to remote full-stack roles, and always happy to talk 
 ---
 
 <Base title={`${name} | Full-stack software developer`} description={`${name}, full-stack software developer. I build the tools engineers use.`}>
+  <canvas class="cloud" aria-hidden="true" data-cloud></canvas>
   <main id="content">
     <section class="intro" id="intro" aria-labelledby="intro-title">
-      <canvas class="sphere" aria-hidden="true" data-sphere></canvas>
-
       <header class="intro-text">
         <h1 class="intro-name" id="intro-title" data-intro-name>
           <span class="visually-hidden">{name}</span>
@@ -87,7 +86,7 @@ const contactPitch = 'Open to remote full-stack roles, and always happy to talk 
       <h2 class="visually-hidden" id="projects-title">Projects</h2>
       {
         projects.map(({ slug, title, description, visual }, i) => (
-          <article class="project" aria-labelledby={`project-${slug}`}>
+          <article class="project" data-slug={slug} aria-labelledby={`project-${slug}`}>
             <div class="project-text">
               <span class="project-index">{String(i + 1).padStart(2, '0')}</span>
               <h3 class="project-title" id={`project-${slug}`}>{title}</h3>
