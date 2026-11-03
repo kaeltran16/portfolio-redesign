@@ -2,7 +2,8 @@
 // headless chrome's window cannot go below ~500px wide, so phone sizes need device emulation.
 // usage: node scripts/shots.mjs [outDir]   (dev server on http://localhost:4321, or set BASE_URL;
 // SHOTS_SERVE=1 serves the last build (dist/) itself on a free port instead, so run `npm run build` first;
-// SHOTS=phone-390,role-wipe runs only those)
+// SHOTS=phone-390,role-wipe runs only those). exits 1 on a failed step, and 3 when everything else passed but a
+// gpu step was skipped because chrome had no gpu
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -124,14 +125,14 @@ const ARC = 1;
 const SIEM = 2;
 const OPAL = 3;
 const frames = 'new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))';
-// scrolls a pinned row to the middle of step k: its top plus (k - 0.5) / steps of its pinned scroll length.
-// fonts first, since the driver re-measures rows when they arrive
-const toStep = (n, k) => `(async () => {
+// scrolls a pinned row to the middle of step k: its top plus (k - 0.5) / steps of its pinned scroll length, or
+// `share` of the way there from the top of the page. fonts first, since the driver re-measures rows when they arrive
+const toStep = (n, k, share = 1) => `(async () => {
   await document.fonts.ready;
   const row = document.querySelector('${row(n)}');
   const steps = Number(row.querySelector('.scene').dataset.steps);
   const { top, height } = row.getBoundingClientRect();
-  window.scrollTo({ top: scrollY + top + (height - innerHeight) * (${k} - 0.5) / steps, behavior: 'instant' });
+  window.scrollTo({ top: ${share} * (scrollY + top + (height - innerHeight) * (${k} - 0.5) / steps), behavior: 'instant' });
   await ${frames};
 })()`;
 // scrolls an unpinned row so its visual's centre sits where the reveal reads the middle of step k
@@ -226,6 +227,38 @@ const steady = n => `(async () => {
   await Promise.all(replayed.map(a => a.finished));
   return new Set(tops).size > 1 ? 'box moves between steps, tops ' + tops.join(', ') : '';
 })()`;
+// --- cloud: [data-cloud]'s data-shape names the track shape nearest the scroll position
+const cloudShape = "document.querySelector('[data-cloud]')?.dataset.shape";
+// the cloud is lazy, so a scenario that reads it first waits for its first frame
+const cloudStarted = `(async () => {
+  for (let i = 0; i < 180 && !${cloudShape}; i++) await ${frames};
+})()`;
+const cloudShows = shape => `(() => {
+  const shape = ${cloudShape};
+  return shape === '${shape}' ? '' : 'cloud shows ' + shape + ', not ${shape}';
+})()`;
+// returns an error string unless the point at the element's centre hits the element, so nothing is drawn over it
+const hitsText = selector => `(() => {
+  const el = document.querySelector('${selector}');
+  const r = el.getBoundingClientRect();
+  const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  return el.contains(hit) ? '' : '${selector} centre hits ' + (hit ? hit.tagName + '.' + hit.getAttribute('class') : 'nothing, so it is off screen');
+})()`;
+// on phones the row's title is below its visual, off screen at a step, so the captions stand in for it: their list,
+// since the hidden captions share the shown one's place and are hit as well
+const cloudInRow = (n, slug, k, text = '.project-title') => allOf(cloudShows(`${slug}-${k}`), hitsText(`${row(n)} ${text}`));
+const CAPTIONS = '.scene-captions';
+// share of the screenshot the cloud must change for these scenes to count as showing it
+const CLOUD_SEEN = {
+  'scene-arc-2': 0.002,
+  'scene-siem-3': 0.001,
+  'scene-siem-4': 0.001,
+  'scene-siem-5': 0.001,
+  'scene-siem-6': 0.001,
+  'scene-siem-3-light': 0.002,
+  'scene-opal-2-phone-390': 0.002,
+};
+
 // the consoles keep their own dark palette in both themes, like a screenshot, so only the captions are checked
 const sceneText = '.scene-captions li span';
 const sceneScenarios = [
@@ -233,21 +266,25 @@ const sceneScenarios = [
   ...[1, 2, 3, 4, 5, 6].map(k => [SIEM, 'siem', k, false]),
   [ARC, 'arc', 2, true],
   [SIEM, 'siem', 3, true],
-].map(([n, slug, k, light]) => ({
-  name: `scene-${slug}-${k}${light ? '-light' : ''}`,
-  viewport: desktop,
-  waitMs: 1000,
-  eval: light ? `${toggleTheme}; ${toStep(n, k)}` : toStep(n, k),
-  check: allOf(pinned(n), showsStep(n, k), readable(row(n), sceneText)),
-  step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 4 : 6}, ${light ? 'light' : 'dark'}: row pinned, only panel ${k} lit and its command in the box, only caption ${k} shown, text at 4.5:1 or more`,
-}));
+].map(([n, slug, k, light]) => {
+  const name = `scene-${slug}-${k}${light ? '-light' : ''}`;
+  return {
+    name,
+    viewport: desktop,
+    waitMs: 1000,
+    eval: light ? `${toggleTheme}; ${toStep(n, k)}` : toStep(n, k),
+    check: allOf(pinned(n), showsStep(n, k), readable(row(n), sceneText), cloudInRow(n, slug, k)),
+    cloudVisible: CLOUD_SEEN[name],
+    step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 4 : 6}, ${light ? 'light' : 'dark'}: row pinned, only panel ${k} lit and its command in the box, only caption ${k} shown, text at 4.5:1 or more, the cloud on ${slug}-${k} beneath the title${CLOUD_SEEN[name] ? ' and visible' : ''}`,
+  };
+});
 const opalScenarios = [[1, false], [2, false], [3, false], [4, false], [2, true]].map(([k, light]) => ({
   name: `scene-opal-${k}${light ? '-light' : ''}`,
   viewport: desktop,
   waitMs: 1000,
   eval: light ? `${toggleTheme}; ${toStep(OPAL, k)}` : toStep(OPAL, k),
-  check: allOf(pinned(OPAL), showsScreen(OPAL, k), readable(row(OPAL), `${sceneText}, .phone-names li`)),
-  step: `opal scene scrolled to step ${k} of 4, ${light ? 'light' : 'dark'}: row pinned, only screen ${k} in the phone, only its name marked and its caption shown, text at 4.5:1 or more`,
+  check: allOf(pinned(OPAL), showsScreen(OPAL, k), readable(row(OPAL), `${sceneText}, .phone-names li`), cloudInRow(OPAL, 'opal', k)),
+  step: `opal scene scrolled to step ${k} of 4, ${light ? 'light' : 'dark'}: row pinned, only screen ${k} in the phone, only its name marked and its caption shown, text at 4.5:1 or more, the cloud on opal-${k} beneath the title`,
 }));
 const steadyScenarios = [[ARC, 'arc'], [SIEM, 'siem'], [OPAL, 'opal']].map(([n, slug]) => ({
   name: `scene-${slug}-steady`,
@@ -422,6 +459,115 @@ const caseNavPlain = `(() => {
   return document.querySelector('[aria-current]') ? 'a link is current on a case page' : '';
 })()`;
 
+// --- motion: smooth scroll, split headings, experience entrances
+const HEADINGS = '.project-title, .section-title';
+const ROLE_ITEMS = '.experience-dates, .experience-body h3, .experience-company, .experience-body li';
+const motionKit = `
+  const atRest = el => { const t = getComputedStyle(el).transform; return t === 'none' || new DOMMatrix(t).isIdentity; };
+`;
+// returns an error string unless every heading is split, opal's letters wait below their line, and each heading's
+// accessible text is its text as served
+const headingsWaiting = `(async () => {
+  ${motionKit}
+  const served = new DOMParser().parseFromString(await (await fetch(location.href)).text(), 'text/html');
+  const headings = [...document.querySelectorAll('${HEADINGS}')];
+  const errors = [];
+  if (headings.length !== served.querySelectorAll('${HEADINGS}').length) errors.push('found ' + headings.length + ' headings, the page serves ' + served.querySelectorAll('${HEADINGS}').length);
+  for (const h of headings) {
+    if (!h.querySelector('.split-char')) errors.push('#' + h.id + ' is not split');
+    const want = served.getElementById(h.id).textContent.trim();
+    const name = h.getAttribute('aria-label') ?? h.textContent.trim();
+    if (name !== want) errors.push('#' + h.id + ' reads "' + name + '", not "' + want + '"');
+  }
+  const opal = [...document.querySelectorAll('#project-opal .split-char')];
+  if (!opal.length || opal.some(atRest)) errors.push('opal title letters are at rest before it is in view');
+  return errors.join('; ');
+})()`;
+// scrolls to Experience once the entrances are set up, and records the first role's title offset every frame for 1s
+const watchEntrance = `(async () => {
+  for (let i = 0; i < 180 && !document.querySelector('.split-char'); i++) await ${frames};
+  const title = document.querySelector('.experience-role h3');
+  ${showExperience};
+  window.lowest = Infinity;
+  for (const end = performance.now() + 1000; performance.now() < end; await new Promise(r => requestAnimationFrame(r))) {
+    window.lowest = Math.min(window.lowest, new DOMMatrix(getComputedStyle(title).transform).m42);
+  }
+})()`;
+
+// --- the cloud's canvas, track and cost
+// returns an error string unless there is one cloud canvas, fixed over the whole viewport and taking no pointer
+// events, and the sphere's own canvas is gone
+const cloudCanvas = `(() => {
+  const clouds = document.querySelectorAll('[data-cloud]');
+  if (clouds.length !== 1) return 'found ' + clouds.length + ' cloud canvases, not 1';
+  const style = getComputedStyle(clouds[0]);
+  const r = clouds[0].getBoundingClientRect();
+  const errors = [];
+  if (style.position !== 'fixed') errors.push('cloud is ' + style.position + ', not fixed');
+  if (style.pointerEvents !== 'none') errors.push('cloud takes pointer events');
+  if (r.left || r.top || r.width !== innerWidth || r.height !== innerHeight) {
+    errors.push('cloud is ' + r.width + 'x' + r.height + ' at ' + r.left + ',' + r.top + ', not the ' + innerWidth + 'x' + innerHeight + ' viewport');
+  }
+  if (document.querySelector('[data-sphere]')) errors.push('the old sphere canvas is still there');
+  return errors.join('; ');
+})()`;
+// scrolls from the top to past Experience a twelfth of the viewport at a time; returns an error string unless the
+// shapes the cloud names, repeats dropped, are the whole track in order
+const cloudSweep = `(async () => {
+  await document.fonts.ready;
+  await ${cloudStarted};
+  const rows = [...document.querySelectorAll('#projects .project')].filter(r => r.querySelector('.scene'));
+  const steps = r => Array.from({ length: Number(r.querySelector('.scene').dataset.steps) }, (_, k) => r.dataset.slug + '-' + (k + 1));
+  const want = ['sphere', ...rows.flatMap(steps), 'settle'];
+  const seen = [];
+  const end = scrollY + document.getElementById('experience').getBoundingClientRect().bottom;
+  for (let y = 0; y <= end; y += innerHeight / 12) {
+    window.scrollTo({ top: y, behavior: 'instant' });
+    await ${frames};
+    const shape = ${cloudShape};
+    if (seen.at(-1) !== shape) seen.push(shape);
+  }
+  return seen.join() === want.join() ? '' : 'cloud passed [' + seen.join(', ') + '], not [' + want.join(', ') + ']';
+})()`;
+// injected before load: canvases give no webgl context, and warnings are kept for the check
+const noWebgl = `(() => {
+  const getContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+    return /^webgl2?$/.test(type) ? null : getContext.call(this, type, ...rest);
+  };
+  window.warnings = [];
+  const warn = console.warn;
+  console.warn = (...args) => (window.warnings.push(String(args[0])), warn(...args));
+})()`;
+const FPS_SWEEP_MS = 2500;
+const MIN_FPS = 50;
+// the name of what draws the page's webgl, so a gpu scenario can tell a gpu from swiftshader
+const webglRenderer = `(() => {
+  const gl = document.createElement('canvas').getContext('webgl');
+  const info = gl?.getExtension('WEBGL_debug_renderer_info');
+  return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : 'no webgl';
+})()`;
+// summed rgb difference over which a pixel counts as changed, above png and antialiasing noise
+const PIXEL_CHANGED = 24;
+// returns an error string unless at least `share` of the pixels differ between two base64 pngs, decoded in the page
+const cloudChanges = (shown, bare, share) => `(async () => {
+  const pixels = async src => {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    const ctx = Object.assign(document.createElement('canvas'), { width: img.width, height: img.height }).getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    return ctx.getImageData(0, 0, img.width, img.height).data;
+  };
+  const [a, b] = await Promise.all([${JSON.stringify(`data:image/png;base64,${shown}`)}, ${JSON.stringify(`data:image/png;base64,${bare}`)}].map(pixels));
+  let changed = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > ${PIXEL_CHANGED}) changed++;
+  }
+  const got = changed / (a.length / 4);
+  return got >= ${share} ? '' : 'the cloud changes ' + (got * 100).toFixed(2) + '% of the pixels, under ${share * 100}%';
+})()`;
+
 const SCENARIOS = [
   { name: 'desktop', viewport: desktop, waitMs: 7000, check: titleFits },
   // role words change every 5s; 6.2s lands inside the wipe of the second word
@@ -503,15 +649,21 @@ const SCENARIOS = [
     viewport: phone,
     waitMs: 1000,
     eval: toRevealStep(OPAL, 2),
-    check: allOf(`document.querySelector('${row(OPAL)}').hasAttribute('data-pinned') ? 'opal row is pinned' : ''`, showsScreen(OPAL, 2), readable(row(OPAL), `${sceneText}, .phone-names li`)),
-    step: 'opal scene scrolled to step 2 on a 390px phone: not pinned, only the Areas screen in the phone, its name marked and its caption shown, within the width',
+    check: allOf(
+      `document.querySelector('${row(OPAL)}').hasAttribute('data-pinned') ? 'opal row is pinned' : ''`,
+      showsScreen(OPAL, 2),
+      readable(row(OPAL), `${sceneText}, .phone-names li`),
+      cloudInRow(OPAL, 'opal', 2, CAPTIONS),
+    ),
+    cloudVisible: CLOUD_SEEN['scene-opal-2-phone-390'],
+    step: 'opal scene scrolled to step 2 on a 390px phone: not pinned, only the Areas screen in the phone, its name marked and its caption shown, within the width, the cloud on opal-2 beneath the caption and visible',
   },
   {
     name: 'scene-siem-2-phone-390',
     viewport: phone,
     waitMs: 1000,
     eval: toRevealStep(SIEM, 2),
-    check: `(() => {
+    check: allOf(cloudInRow(SIEM, 'siem', 2, CAPTIONS), `(() => {
       ${sceneKit}
       const row = document.querySelector('${row(SIEM)}');
       if (row.dataset.step !== '2') return 'row is at step ' + row.dataset.step + ', not 2';
@@ -526,8 +678,9 @@ const SCENARIOS = [
       if (dash.left < -0.5 || dash.right > innerWidth + 0.5) return 'console runs past the viewport width';
       if (caption && box.bottom > caption.top + 0.5) return 'box overlaps the step caption';
       return box.bottom > text.top + 0.5 ? 'box overlaps the row text' : '';
-    })()`,
-    step: 'siem scene scrolled to step 2 on a 390px phone: not pinned, only the risk panel shows, the console inside its box and the width, above the caption and the row text',
+    })()`),
+    cloudVisible: 0.001,
+    step: 'siem scene scrolled to step 2 on a 390px phone: not pinned, only the risk panel shows, the console inside its box and the width, above the caption and the row text, the cloud on siem-2 beneath the caption and visible',
   },
   {
     name: 'scenes-phone-390',
@@ -644,9 +797,11 @@ const SCENARIOS = [
       if (heading.top < 0 || heading.bottom > innerHeight) errors.push('experience heading is not in the viewport');
       const behind = roles.filter(role => role.getBoundingClientRect().top < reading && !role.hasAttribute('data-reached'));
       if (behind.length) errors.push(behind.length + ' roles above the reading line are not reached');
+      const shape = ${cloudShape};
+      if (shape !== 'settle') errors.push('cloud shows ' + shape + ', not settle');
       return errors.join('; ');
     })()`,
-    step: 'opened at /#experience: the arc and siem rows above show their last step, the heading is in view, the timeline drawn to the reading line',
+    step: 'opened at /#experience: the arc and siem rows above show their last step, the heading is in view, the timeline drawn to the reading line, the cloud already settled',
   },
   {
     name: 'scenes-reduced-motion',
@@ -752,7 +907,217 @@ const SCENARIOS = [
     clip: '#experience',
     step: 'experience timeline under reduced motion: not drawing, every marker filled, the whole line accent',
   },
+  {
+    name: 'smooth-wheel',
+    viewport: desktop,
+    waitMs: 1500,
+    wheel: { deltaY: 800 },
+    after: `${frames}.then(() => (window.glided = scrollY))`,
+    check: `(() => {
+      if (!document.documentElement.classList.contains('lenis')) return 'html has no lenis class';
+      if (!(window.glided > 0 && window.glided < 800)) return 'two frames after the wheel the page was at ' + window.glided + ', not part way to 800';
+      return Math.abs(scrollY - 800) <= 2 ? '' : 'the glide settled at ' + scrollY + ', not 800';
+    })()`,
+    step: 'a real 800px wheel at 1440px: the page glides, part way two frames in, at 800 once settled',
+  },
+  {
+    name: 'smooth-nav-jump',
+    viewport: desktop,
+    waitMs: 1500,
+    wheel: { deltaY: 3000 },
+    after: `document.querySelector('.rail-link[href$="#about"]').click()`,
+    check: `(() => {
+      if (location.hash !== '#about') return 'hash is ' + location.hash + ', not #about';
+      const r = document.querySelector('#about .section-title').getBoundingClientRect();
+      return r.top >= 0 && r.bottom <= innerHeight ? '' : 'about heading at ' + Math.round(r.top) + 'px, outside the viewport';
+    })()`,
+    step: 'the about rail link clicked during a 3000px wheel glide: the page lands on about and stays',
+  },
+  {
+    name: 'smooth-menu-wheel',
+    // the menu's 292px of content overflows only below ~391px tall at this width
+    viewport: { ...desktop, height: 360 },
+    waitMs: 800,
+    eval: `${openMenu}; window.startY = scrollY`,
+    wheel: { at: '.menu', deltaY: 300 },
+    check: `(() => {
+      const menu = document.querySelector('.menu');
+      if (menu.scrollHeight <= menu.clientHeight) return 'menu content (' + menu.scrollHeight + 'px) fits its ' + menu.clientHeight + 'px at ' + innerWidth + 'x' + innerHeight + ', so a wheel over it is untested';
+      if (!menu.matches(':popover-open')) return 'menu is not open';
+      if (menu.scrollTop <= 0) return 'menu did not scroll under the wheel';
+      return scrollY === window.startY ? '' : 'the page moved from ' + window.startY + ' to ' + scrollY + ' under the menu';
+    })()`,
+    step: 'a 300px wheel over the open menu at 1440x360, where it overflows: the menu scrolls, the page stays',
+  },
+  {
+    name: 'headings-waiting',
+    viewport: desktop,
+    waitMs: 1500,
+    check: headingsWaiting,
+    step: 'top of the page at 1440px: every project and section heading split into letters, opal’s waiting below its line, each heading read by its own text',
+  },
+  {
+    name: 'headings-revealed',
+    viewport: desktop,
+    waitMs: 1500,
+    eval: show('about'),
+    check: `(() => {
+      ${motionKit}
+      const chars = [...document.querySelectorAll('#about .section-title .split-char')];
+      if (!chars.length) return 'about title is not split';
+      const moving = chars.filter(c => !atRest(c));
+      return moving.length ? moving.length + ' about title letters are not at rest' : '';
+    })()`,
+    step: 'about scrolled into view: its title letters have risen to rest',
+  },
+  {
+    name: 'experience-enter',
+    viewport: desktop,
+    waitMs: 1000,
+    eval: watchEntrance,
+    check: `(() => {
+      ${motionKit}
+      const errors = [];
+      if (!(window.lowest < -0.5)) errors.push('first role title went no higher than ' + window.lowest + 'px, so it did not overshoot');
+      const entered = [...document.querySelectorAll('.experience-role')].filter(role => role.getBoundingClientRect().top < innerHeight);
+      const items = entered.flatMap(role => [...role.querySelectorAll('${ROLE_ITEMS}')]);
+      if (!items.length) errors.push('no role entered the viewport');
+      const unsettled = items.filter(el => !atRest(el) || getComputedStyle(el).opacity !== '1');
+      if (unsettled.length) errors.push(unsettled.length + ' entered role items are not at rest and opaque');
+      return errors.join('; ');
+    })()`,
+    clip: '#experience',
+    step: 'experience scrolled into view: the first role springs in past its rest and settles within a second, every item opaque',
+  },
+  {
+    name: 'motion-reduced',
+    viewport: desktop,
+    waitMs: 1000,
+    reduced: true,
+    eval: showExperience,
+    check: `(() => {
+      const errors = [];
+      if (document.documentElement.classList.contains('lenis')) errors.push('smooth scroll is on');
+      if (document.querySelector('.split-char')) errors.push('a heading is split');
+      const styled = [...document.querySelectorAll('${ROLE_ITEMS}')].filter(el => el.style.transform || el.style.opacity);
+      if (styled.length) errors.push(styled.length + ' experience items carry an inline transform or opacity');
+      return errors.join('; ');
+    })()`,
+    step: 'experience under reduced motion: no smooth scroll, no split headings, no entrance styles',
+  },
+  ...[
+    ['cloud-hero', desktop, false],
+    ['cloud-hero-phone-390', phone, false],
+    ['cloud-hero-light', desktop, true],
+  ].map(([name, viewport, light]) => ({
+    name,
+    viewport,
+    // the canvas fades in over 3s
+    waitMs: 3500,
+    eval: light ? toggleTheme : undefined,
+    check: allOf(cloudCanvas, cloudShows('sphere'), hitsText('[data-intro-name]')),
+    cloudVisible: 0.02,
+    step: `top of the page at ${viewport.width}px, ${light ? 'light' : 'dark'}: one fixed, viewport-sized cloud canvas that takes no pointer events, showing the sphere and visible, no old sphere canvas, the intro name uncovered`,
+  })),
+  {
+    name: 'cloud-dissolve',
+    viewport: desktop,
+    waitMs: 2500,
+    eval: toStep(ARC, 1, 0.4),
+    check: cloudShows('sphere'),
+    cloudVisible: 0.005,
+    step: 'scrolled 40% of the way to the first arc step at 1440px: the cloud still names the sphere, which breaks into dots',
+  },
+  ...[
+    ['cloud-sweep', desktop],
+    ['cloud-sweep-phone-390', phone],
+  ].map(([name, viewport]) => ({
+    name,
+    viewport,
+    waitMs: 500,
+    check: cloudSweep,
+    step: `scrolling from the top to past Experience at ${viewport.width}px, a twelfth of the viewport at a time: the cloud passes every track shape in order and never goes back`,
+  })),
+  { name: 'cloud-settle', viewport: desktop, waitMs: 1000, eval: showExperience, check: cloudShows('settle'), step: 'experience scrolled into view: the cloud settles' },
+  {
+    name: 'cloud-resize',
+    viewport: desktop,
+    eval: `${toStep(ARC, 2)}.then(() => (window.wasPinned = document.querySelector('${row(ARC)}').hasAttribute('data-pinned')))`,
+    resize: shortWindow,
+    waitMs: 1000,
+    // the shorter page leaves the scroll position past the arc row, so the check scrolls back to its step 2, which
+    // the cloud's old pinned anchors would place elsewhere
+    check: `(async () => {
+      const row = document.querySelector('${row(ARC)}');
+      if (!window.wasPinned) return 'arc row was not pinned before the resize';
+      if (row.hasAttribute('data-pinned')) return 'arc row is still pinned at ' + innerWidth + 'x' + innerHeight;
+      await ${toRevealStep(ARC, 2)};
+      const shape = ${cloudShape};
+      if (row.dataset.step !== '2') return 'arc row is at step ' + row.dataset.step + ', not 2';
+      return shape === 'arc-' + row.dataset.step ? '' : 'cloud shows ' + shape + ' with the arc row at step ' + row.dataset.step;
+    })()`,
+    step: 'arc row pinned at step 2, then the window made 1280x480 so it unpins, then scrolled back to its step 2: the cloud re-anchored and shows arc-2',
+  },
+  {
+    name: 'cloud-reduced-motion',
+    viewport: desktop,
+    waitMs: 1000,
+    reduced: true,
+    eval: `(async () => {
+      await ${cloudStarted};
+      window.framesAsked = 0;
+      const ask = window.requestAnimationFrame.bind(window);
+      window.requestAnimationFrame = callback => (window.framesAsked++, ask(callback));
+      document.querySelector('${row(SIEM)} .project-visual').scrollIntoView({ block: 'center', behavior: 'instant' });
+    })()`,
+    check: `(() => {
+      const shape = ${cloudShape};
+      if (window.framesAsked) return window.framesAsked + ' animation frames requested under reduced motion';
+      return shape?.startsWith('siem-') ? '' : 'cloud shows ' + shape + ' with the siem row in view';
+    })()`,
+    step: 'siem row scrolled into view under reduced motion: the cloud redraws on scroll with a siem shape, and nothing requests an animation frame for a second',
+  },
+  {
+    name: 'cloud-no-webgl',
+    viewport: desktop,
+    waitMs: 1000,
+    init: noWebgl,
+    eval: toStep(ARC, 2),
+    check: allOf(
+      `document.querySelector('[data-shape]') ? 'the cloud drew with no webgl' : ''`,
+      `window.warnings.some(w => w.startsWith('cloud failed to start')) ? '' : 'no warning that the cloud failed to start'`,
+      showsStep(ARC, 2),
+      `document.querySelector('.split-char') ? '' : 'headings are not split'`,
+    ),
+    step: 'no webgl: no cloud and a warning, no error; the arc row still steps when scrolled and the headings still split',
+  },
+  {
+    name: 'cloud-phone-fps',
+    viewport: phone,
+    gpu: true,
+    throttle: 4,
+    waitMs: 0,
+    eval: `(async () => {
+      await ${cloudStarted};
+      const { top, bottom } = document.getElementById('projects').getBoundingClientRect();
+      const from = scrollY + top;
+      const begin = performance.now();
+      let count = 0;
+      for (let now = begin; now - begin < ${FPS_SWEEP_MS}; now = await new Promise(r => requestAnimationFrame(r))) {
+        window.scrollTo({ top: from + (bottom - top) * (now - begin) / ${FPS_SWEEP_MS}, behavior: 'instant' });
+        count++;
+      }
+      window.fps = count / ((performance.now() - begin) / 1000);
+    })()`,
+    check: `window.fps >= ${MIN_FPS} ? '' : 'scrolling the projects ran at ' + window.fps.toFixed(1) + ' fps, under ${MIN_FPS}'`,
+    step: `projects scrolled one step per frame over ${FPS_SWEEP_MS / 1000}s on a 390px phone, cpu slowed 4x, on a gpu: ${MIN_FPS} fps or more`,
+  },
 ];
+// the viewport point at the centre of a selector, or of the viewport with none
+const centreOf = selector => `(() => {
+  const r = ${selector ? `document.querySelector('${selector}').getBoundingClientRect()` : '{ left: 0, top: 0, width: innerWidth, height: innerHeight }'};
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+})()`;
 // the page-space rect of a selector, for a screenshot of a section taller than the viewport
 const clipOf = selector => `(() => {
   const r = document.querySelector('${selector}').getBoundingClientRect();
@@ -772,26 +1137,56 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const preview = process.env.SHOTS_SERVE === '1' ? await startPreview() : undefined;
 const BASE_URL = preview?.url ?? process.env.BASE_URL ?? 'http://localhost:4321/';
 
-// port 0 lets chrome pick a free devtools port, which it writes to DevToolsActivePort in the profile
-const profile = mkdtempSync(join(tmpdir(), 'shots-profile-'));
-const chrome = spawn(CHROME, [
-  '--headless=new',
-  '--enable-unsafe-swiftshader',
-  '--use-angle=swiftshader',
-  '--hide-scrollbars',
-  '--no-first-run',
-  '--remote-debugging-port=0',
-  `--user-data-dir=${profile}`,
-  'about:blank',
-], { stdio: 'ignore' });
-
+// the software renderer keeps screenshots alike on any machine; `gpu` scenarios run in a second chrome without it
+const SOFTWARE_GL = ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'];
+const browsers = [];
 const errors = [];
+// gpu steps that could not run because that chrome still drew in software
+const unverified = [];
 
 try {
-  const ws = await connect();
+  const software = await launch(SOFTWARE_GL);
+  let gpu;
+  const shots = [];
+  for (const s of selected) {
+    shots.push(await run(s.gpu ? (gpu ??= await launch([])) : software, s));
+  }
+  writeFileSync(join(OUT, 'shots.json'), JSON.stringify(shots, null, 2));
+} finally {
+  for (const { ws, chrome } of browsers) {
+    ws?.close();
+    chrome.kill();
+  }
+  preview?.server.kill();
+}
+
+if (errors.length) {
+  console.error(`page errors:\n${errors.join('\n')}`);
+  process.exit(1);
+}
+if (unverified.length) {
+  console.log(`unverified, no gpu: ${unverified.join('; ')}`);
+  process.exit(3);
+}
+
+// a headless chrome on a free devtools port, with `send` for its protocol and `listeners` for its events
+async function launch(flags) {
+  // port 0 lets chrome pick a free devtools port, which it writes to DevToolsActivePort in the profile
+  const profile = mkdtempSync(join(tmpdir(), 'shots-profile-'));
+  const chrome = spawn(CHROME, [
+    '--headless=new',
+    ...flags,
+    '--hide-scrollbars',
+    '--no-first-run',
+    '--remote-debugging-port=0',
+    `--user-data-dir=${profile}`,
+    'about:blank',
+  ], { stdio: 'ignore' });
+  const browser = { chrome, listeners: [] };
+  browsers.push(browser);
+  const ws = (browser.ws = await connect(profile));
   let id = 0;
   const pending = new Map();
-  const listeners = [];
   ws.addEventListener('message', ({ data }) => {
     const msg = JSON.parse(data);
     if (msg.id && pending.has(msg.id)) {
@@ -799,31 +1194,42 @@ try {
       pending.delete(msg.id);
       msg.error ? reject(new Error(`${msg.error.message} (${msg.error.code})`)) : resolve(msg.result);
     } else {
-      listeners.forEach(fn => fn(msg));
+      browser.listeners.forEach(fn => fn(msg));
     }
   });
-  const send = (method, params = {}, sessionId) =>
+  browser.send = (method, params = {}, sessionId) =>
     new Promise((resolve, reject) => {
       pending.set(++id, { resolve, reject });
       ws.send(JSON.stringify({ id, method, params, sessionId }));
     });
+  return browser;
+}
 
-  const shots = [];
-  for (const s of selected) {
-    // a fresh context per scenario so a stored theme or background does not leak into the next
-    const { browserContextId } = await send('Target.createBrowserContext');
-    const { targetId } = await send('Target.createTarget', { url: 'about:blank', browserContextId });
-    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
-    const onEvent = msg => {
-      if (msg.sessionId !== sessionId) return;
-      if (msg.method === 'Runtime.exceptionThrown') {
-        errors.push(`${s.name}: ${msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text}`);
-      }
-      if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
-        errors.push(`${s.name}: console.error ${msg.params.args.map(a => a.value ?? a.description).join(' ')}`);
-      }
-    };
-    listeners.push(onEvent);
+// runs one scenario in its own tab and returns its shots.json entry
+async function run({ send, listeners }, s) {
+  // a fresh context per scenario so a stored theme or background does not leak into the next
+  const { browserContextId } = await send('Target.createBrowserContext');
+  const { targetId } = await send('Target.createTarget', { url: 'about:blank', browserContextId });
+  const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
+  const onEvent = msg => {
+    if (msg.sessionId !== sessionId) return;
+    if (msg.method === 'Runtime.exceptionThrown') {
+      errors.push(`${s.name}: ${msg.params.exceptionDetails.exception?.description ?? msg.params.exceptionDetails.text}`);
+    }
+    if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') {
+      errors.push(`${s.name}: console.error ${msg.params.args.map(a => a.value ?? a.description).join(' ')}`);
+    }
+  };
+  listeners.push(onEvent);
+  const evaluate = expression => send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, sessionId);
+  // a check that throws must fail, not read as a pass
+  const expectNoError = async (what, expression) => {
+    const { result, exceptionDetails } = await evaluate(expression);
+    if (exceptionDetails) errors.push(`${s.name}: ${what} threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
+    else if (result.value) errors.push(`${s.name}: ${result.value}`);
+  };
+  const step = s.step ?? `open at ${s.viewport.width}px${s.reduced ? ', reduced motion' : ''}${s.eval ? ', theme toggled' : ''}${s.clip ? `, ${s.clip} captured` : ''}`;
+  try {
     await send('Runtime.enable', {}, sessionId);
     await send('Page.enable', {}, sessionId);
     await send('Emulation.setDeviceMetricsOverride', s.viewport, sessionId);
@@ -831,43 +1237,56 @@ try {
     await send('Emulation.setEmulatedMedia', {
       features: [{ name: 'prefers-reduced-motion', value: s.reduced ? 'reduce' : 'no-preference' }],
     }, sessionId);
+    if (s.init) await send('Page.addScriptToEvaluateOnNewDocument', { source: s.init }, sessionId);
     await send('Page.navigate', { url: new URL(s.page ?? '', BASE_URL).href }, sessionId);
     await sleep(800);
+    if (s.gpu) {
+      const renderer = (await evaluate(webglRenderer)).result.value;
+      if (/swiftshader|no webgl/i.test(renderer)) {
+        unverified.push(`${s.name} (${renderer})`);
+        console.log(`skipped ${s.name}: chrome draws with ${renderer}`);
+        return { name: s.name, files: [], steps: [{ step, state: 'skip', detail: `no gpu: chrome draws with ${renderer}` }] };
+      }
+    }
+    // after load, so it slows what the scenario measures rather than the page's start
+    if (s.throttle) await send('Emulation.setCPUThrottlingRate', { rate: s.throttle }, sessionId);
     if (s.eval) {
       const { exceptionDetails } = await send('Runtime.evaluate', { expression: s.eval, awaitPromise: true }, sessionId);
       if (exceptionDetails) errors.push(`${s.name}: eval threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
     }
+    // a real wheel through the input pipeline: a synthetic WheelEvent never scrolls anything natively.
+    // `after` runs at once, to act while the scroll it starts is still under way
+    if (s.wheel) {
+      const { result } = await send('Runtime.evaluate', { expression: centreOf(s.wheel.at), returnByValue: true }, sessionId);
+      await send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...result.value, deltaX: 0, deltaY: s.wheel.deltaY }, sessionId);
+      if (s.after) {
+        const { exceptionDetails } = await send('Runtime.evaluate', { expression: s.after, awaitPromise: true }, sessionId);
+        if (exceptionDetails) errors.push(`${s.name}: after threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
+      }
+    }
     // a window resized mid-scenario, after the eval has set up the state before it
     if (s.resize) await send('Emulation.setDeviceMetricsOverride', s.resize, sessionId);
     await sleep(s.waitMs);
-    if (s.check) {
-      const { result, exceptionDetails } = await send('Runtime.evaluate', { expression: s.check, returnByValue: true, awaitPromise: true }, sessionId);
-      // a check that throws must fail, not read as a pass
-      if (exceptionDetails) errors.push(`${s.name}: check threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
-      else if (result.value) errors.push(`${s.name}: ${result.value}`);
-    }
-    const clip = s.clip && (await send('Runtime.evaluate', { expression: clipOf(s.clip), returnByValue: true }, sessionId)).result.value;
-    const { data } = await send('Page.captureScreenshot', clip ? { format: 'png', clip, captureBeyondViewport: true } : { format: 'png' }, sessionId);
+    if (s.check) await expectNoError('check', s.check);
+    const clip = s.clip && (await evaluate(clipOf(s.clip))).result.value;
+    const screenshot = clip ? { format: 'png', clip, captureBeyondViewport: true } : { format: 'png' };
+    const { data } = await send('Page.captureScreenshot', screenshot, sessionId);
     const file = `${s.name}.png`;
     writeFileSync(join(OUT, file), Buffer.from(data, 'base64'));
-    const step = s.step ?? `open at ${s.viewport.width}px${s.reduced ? ', reduced motion' : ''}${s.eval ? ', theme toggled' : ''}${s.clip ? `, ${s.clip} captured` : ''}`;
+    console.log(`wrote ${join(OUT, file)}`);
+    // the same view without the cloud: only pixels can prove it is drawn where it can be seen
+    if (s.cloudVisible) {
+      await evaluate(`document.querySelector('[data-cloud]').style.visibility = 'hidden'; ${frames}`);
+      const { data: bare } = await send('Page.captureScreenshot', screenshot, sessionId);
+      await expectNoError('cloud comparison', cloudChanges(data, bare, s.cloudVisible));
+    }
     const failed = errors.filter(e => e.startsWith(`${s.name}: `));
-    shots.push({ name: s.name, files: [file], steps: [{ step, state: failed.length ? 'fail' : 'pass', detail: failed.join('; ') || undefined }] });
+    return { name: s.name, files: [file], steps: [{ step, state: failed.length ? 'fail' : 'pass', detail: failed.join('; ') || undefined }] };
+  } finally {
     listeners.splice(listeners.indexOf(onEvent), 1);
     await send('Target.closeTarget', { targetId });
     await send('Target.disposeBrowserContext', { browserContextId });
-    console.log(`wrote ${join(OUT, file)}`);
   }
-  writeFileSync(join(OUT, 'shots.json'), JSON.stringify(shots, null, 2));
-  ws.close();
-} finally {
-  chrome.kill();
-  preview?.server.kill();
-}
-
-if (errors.length) {
-  console.error(`page errors:\n${errors.join('\n')}`);
-  process.exit(1);
 }
 
 // serves dist/ on a free port, so parallel runs do not collide on 4321
@@ -896,7 +1315,7 @@ async function startPreview() {
   process.exit(1);
 }
 
-async function connect() {
+async function connect(profile) {
   const portFile = join(profile, 'DevToolsActivePort');
   for (let attempt = 0; attempt < 50; attempt++) {
     try {
