@@ -977,6 +977,19 @@ const SCENARIOS = [
     check: allOf(heroProof(viewport.width >= 1440 ? 2 : Infinity), readable('.intro-pitch', 'p, .inline-link')),
     step: `hero proof line at ${viewport.width}px, ${light ? 'light' : 'dark'}: at most two lines (1440 only), SIEM linked to /projects/siem, Download CV below it, text at 4.5:1 or more`,
   })),
+  // :hover in the selector also fails the check when the mouse missed the link
+  ...[
+    ['hero-proof-hover', false],
+    ['hero-proof-hover-light', true],
+  ].map(([name, light]) => ({
+    name,
+    viewport: desktop,
+    waitMs: 6000,
+    eval: light ? toggleTheme : undefined,
+    hover: '.intro-pitch .inline-link',
+    check: readable('.intro-pitch', '.inline-link:hover'),
+    step: `hero SIEM link hovered at 1440px, ${light ? 'light' : 'dark'}: its text stays at 4.5:1 or more`,
+  })),
   ...[
     ['share-tags', ''],
     ['share-tags-case', 'projects/siem'],
@@ -1421,6 +1434,10 @@ async function run({ send, listeners }, s) {
     }
     // a real wheel through the input pipeline: a synthetic WheelEvent never scrolls anything natively.
     // `after` runs at once, to act while the scroll it starts is still under way
+    if (s.hover) {
+      const { result } = await send('Runtime.evaluate', { expression: centreOf(s.hover), returnByValue: true }, sessionId);
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...result.value }, sessionId);
+    }
     if (s.wheel) {
       const { result } = await send('Runtime.evaluate', { expression: centreOf(s.wheel.at), returnByValue: true }, sessionId);
       await send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...result.value, deltaX: 0, deltaY: s.wheel.deltaY }, sessionId);
