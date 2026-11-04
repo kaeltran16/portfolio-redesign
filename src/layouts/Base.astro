@@ -15,6 +15,12 @@ const { title, description } = Astro.props as { title: string; description: stri
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    {Astro.site && <meta property="og:image" content={new URL('/og.png', Astro.site).href} />}
+    {Astro.site && <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site).href} />}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <script is:inline>
       // set before first paint so there is no theme flash, and so no-js visitors get the final state
