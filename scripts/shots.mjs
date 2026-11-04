@@ -706,6 +706,7 @@ const SCENARIOS = [
   })),
   { name: 'header-desktop-scrolled', viewport: desktop, waitMs: 500, eval: showTitle, check: noHeaderBar, step: 'scrolled at 1440px: no header strip' },
   { name: 'nav-current', viewport: desktop, waitMs: 1000, check: navCurrent, step: 'scrolling to each section marks only its rail and menu link current, none at the top, contact at the end' },
+  { name: 'nav-current-tall', viewport: { ...desktop, height: 1300 }, waitMs: 1000, check: navCurrent, step: 'at 1440x1300: scrolling to each section marks only its rail and menu link current, none at the top, contact at the end' },
   { name: 'nav-jumps', viewport: desktop, waitMs: 1000, check: navJumps(false), step: 'each rail link jumps to its section: target set, heading on screen with its cue, no history entries added' },
   {
     name: 'nav-cue-reduced-motion',

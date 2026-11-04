@@ -1117,6 +1117,9 @@ body {
 }
 
 .contact {
+  /* a full window below the last section, so it can reach the top and every nav jump lands its section there.
+     lvh, as the nav measures against innerHeight, which grows to the large viewport when phone bars hide */
+  min-height: 100lvh;
   gap: var(--spaceXL);
   padding-bottom: var(--space2XL);
 }
