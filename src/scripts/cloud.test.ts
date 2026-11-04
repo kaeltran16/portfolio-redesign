@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as scene from '../lib/scene';
 import * as shapes from '../lib/shapes';
-import { boxTransform, CLOUD_SPREAD, startCloud } from './cloud';
+import { blend, boxTransform, CLOUD_SPREAD, startCloud } from './cloud';
 
 const options = {
   theme: 'dark' as const,
@@ -34,6 +34,21 @@ describe('boxTransform', () => {
   // a siem shape inside 1 / spread is drawn under the opaque console
   it('keeps the halo beyond the visual it is drawn behind', () => {
     expect(shapes.HALO_INNER).toBeGreaterThan(1 / CLOUD_SPREAD);
+  });
+});
+
+describe('blend', () => {
+  it('morphs straight through within one box', () => {
+    expect(blend(0.3, true)).toEqual({ morph: 0.3, fade: 1 });
+  });
+
+  // a dot halfway between two rows would sit over the text between them
+  it('between two boxes, fades out on the first shape and in on the next without moving', () => {
+    expect(blend(0, false)).toEqual({ morph: 0, fade: 1 });
+    expect(blend(0.25, false)).toEqual({ morph: 0, fade: 0.5 });
+    expect(blend(0.5, false).fade).toBe(0);
+    expect(blend(0.75, false)).toEqual({ morph: 1, fade: 0.5 });
+    expect(blend(1, false)).toEqual({ morph: 1, fade: 1 });
   });
 });
 

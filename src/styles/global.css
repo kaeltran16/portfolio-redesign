@@ -832,7 +832,8 @@ body {
   .project,
   .project:nth-of-type(even) {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'visual' 'text';
+    /* title first, so a visitor knows what the visual is before it plays */
+    grid-template-areas: 'text' 'visual';
     gap: var(--spaceXL);
     min-height: 0;
     padding-block: var(--space2XL);
@@ -1087,6 +1088,12 @@ body {
   color: var(--textLight);
 }
 
+/* a flex item stretches, so this keeps the focus ring to the link's own width */
+.experience-case {
+  align-self: flex-start;
+  margin-top: var(--spaceS);
+}
+
 /* --- about and contact ------------------------------------------------------------------------ */
 
 .prose {
@@ -1122,12 +1129,22 @@ body {
   min-height: 100lvh;
   gap: var(--spaceXL);
   padding-bottom: var(--space2XL);
+
+  /* the two auto margins split the window's spare height, so the message sits mid-screen and the copyright at the
+     bottom instead of the message at the top over an empty window */
+  > .section-title,
+  > .contact-meta {
+    margin-top: auto;
+  }
 }
 
+/* the page's closing line, so it reads at a heading's weight rather than as a body paragraph */
 .contact-pitch {
+  max-width: 34ch;
   margin: 0;
-  font-size: var(--fontSizeBodyL);
-  line-height: 1.6;
+  font-size: clamp(calc((22 / 16) * 1rem), 2.4vw, calc((34 / 16) * 1rem));
+  line-height: 1.35;
+  color: var(--textTitle);
 }
 
 .contact-actions {
@@ -1161,7 +1178,7 @@ body {
 }
 
 .contact-meta {
-  margin: var(--space2XL) 0 0;
+  margin: 0;
   font-family: var(--monoFontStack);
   font-size: calc((14 / 16) * 1rem);
   color: var(--textLight);

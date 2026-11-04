@@ -245,7 +245,7 @@ const hitsText = selector => `(() => {
   const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
   return el.contains(hit) ? '' : '${selector} centre hits ' + (hit ? hit.tagName + '.' + hit.getAttribute('class') : 'nothing, so it is off screen');
 })()`;
-// on phones the row's title is below its visual, off screen at a step, so the captions stand in for it: their list,
+// on phones the row's title is above its visual, off screen at a step, so the captions stand in for it: their list,
 // since the hidden captions share the shown one's place and are hit as well
 const cloudInRow = (n, slug, k, text = '.project-title') => allOf(cloudShows(`${slug}-${k}`), hitsText(`${row(n)} ${text}`));
 const CAPTIONS = '.scene-captions';
@@ -404,8 +404,10 @@ const oneLiners = maxLines => `(() => {
   const errors = [];
   const long = [...document.querySelectorAll('.experience-body li')].find(li => lines(li) > ${maxLines});
   if (long) errors.push('bullet "' + long.textContent.trim() + '" is ' + lines(long) + ' lines, over ${maxLines}');
-  const linked = document.querySelectorAll('.experience-role:first-of-type li ' + linkTo).length;
-  if (linked !== 3) errors.push('the first role has ' + linked + ' bullets linked to /projects/siem, not 3');
+  const linked = document.querySelectorAll('.experience-role:first-of-type .experience-body > ' + linkTo).length;
+  if (linked !== 1) errors.push('the first role links to /projects/siem ' + linked + ' times under its bullets, not once');
+  const inBullets = document.querySelectorAll('.experience-body li a').length;
+  if (inBullets) errors.push(inBullets + ' bullets carry a link');
   return errors.join('; ');
 })()`;
 const ABOUT_FACTS = ['Based in', 'Working on', 'Stack', 'Open to'];
@@ -775,7 +777,7 @@ const SCENARIOS = [
       if (!within(dash, box)) return 'console runs out of its box';
       if (dash.left < -0.5 || dash.right > innerWidth + 0.5) return 'console runs past the viewport width';
       if (caption && box.bottom > caption.top + 0.5) return 'box overlaps the step caption';
-      return box.bottom > text.top + 0.5 ? 'box overlaps the row text' : '';
+      return box.top < text.bottom - 0.5 && box.bottom > text.top + 0.5 ? 'box overlaps the row text' : '';
     })()`),
     cloudVisible: 0.001,
     step: 'siem scene scrolled to step 2 on a 390px phone: not pinned, only the risk panel shows, the console inside its box and the width, above the caption and the row text, the cloud on siem-2 beneath the caption and visible',
@@ -936,7 +938,7 @@ const SCENARIOS = [
       id: 'experience',
       text: 'h2, h3, .experience-dates, .experience-company, .experience-body li, .inline-link',
       check: ({ width }) => oneLiners(width >= 1440 ? 1 : 2),
-      claims: ({ width }) => `${width >= 1440 ? 'every bullet one line' : 'every bullet at most two lines'}, the three AI bullets link to the SIEM page`,
+      claims: ({ width }) => `${width >= 1440 ? 'every bullet one line' : 'every bullet at most two lines'}, no bullet is a link, the first role links once to the SIEM page`,
     },
     {
       id: 'about',

@@ -113,6 +113,11 @@ describe('buildTrack', () => {
     }
   });
 
+  // experience is all text, so any dot left behind it crosses a line
+  it('leaves no dot present in the settle, so the cloud ends with the projects', () => {
+    expect(presentIndices(shapeOf('settle'))).toHaveLength(0);
+  });
+
   it('places the siem survivors in the halo, clear of the visual', () => {
     for (const step of [5, 6]) {
       const shape = shapeOf(`siem-${step}`);

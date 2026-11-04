@@ -22,8 +22,8 @@ const SURVIVOR_EVERY = 25;
 const OUTLIER_EVERY = 100;
 // opal's phone is 250:510; the box is 2 tall, so the half width is 250 / 510
 const PHONE = 250 / 510;
-// dimmer than a row's shapes so experience text stays the thing you read
-const SETTLE_PRESENCE = 0.6;
+// the cloud ends with the projects: any dot behind experience crosses its text
+const SETTLE_PRESENCE = 0;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 function mulberry32(seed: number): Random {

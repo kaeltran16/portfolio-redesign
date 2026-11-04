@@ -85,6 +85,13 @@ function ease(t: number): number {
   return t * t * (3 - 2 * t);
 }
 
+// within a row one shape morphs into the next; between rows the dots fade out where they are and in where they go,
+// since flying from one box to the other crosses titles, captions and text
+export function blend(morph: number, sameBox: boolean): { morph: number; fade: number } {
+  if (sameBox) return { morph, fade: 1 };
+  return { morph: morph < 0.5 ? 0 : 1, fade: Math.abs(1 - 2 * morph) };
+}
+
 const DOTS_VERTEX = `
 uniform float time;
 uniform mat4 uSphereModel;
@@ -309,8 +316,11 @@ export function startCloud(
       sphereSurface.opacity = 1 - morph;
       uniforms.uFade.value = Math.min(1, morph / DOTS_IN);
     } else {
-      setBox(uniforms.uFromBox.value, next === index ? nextRect : targets[index].getBoundingClientRect());
-      uniforms.uFade.value = 1;
+      const sameBox = targets[index] === targets[next];
+      setBox(uniforms.uFromBox.value, sameBox ? nextRect : targets[index].getBoundingClientRect());
+      const blended = blend(morph, sameBox);
+      uniforms.uMorph.value = blended.morph;
+      uniforms.uFade.value = blended.fade;
     }
     sphere.visible = onSphere;
     dots.visible = !onSphere || morph > 0;

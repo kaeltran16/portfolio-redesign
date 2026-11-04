@@ -9,27 +9,29 @@ const rolesLabel = `${roles.slice(0, -1).join(', ')}, and ${roles.at(-1)}`;
 // one-line summaries; the full wording lives in the cv (public/cv.pdf), and every number here must match it.
 // the first entry is the current role
 // draft copy until khang finalizes it
-const experience: { title: string; company: string; dates: string; highlights: { text: string; href?: string }[] }[] = [
+// a role with a case page links to it once, under its bullets
+const experience: { title: string; company: string; dates: string; highlights: string[]; caseStudy?: { href: string; label: string } }[] = [
   {
     title: 'Full-stack Engineer',
     company: 'MozoX',
     dates: 'Apr 2023 – now',
     highlights: [
-      { text: 'Log-source onboarding: ~7 days to minutes', href: '/projects/siem' },
-      { text: 'Triage queue cut 95–97% by an AI correlation engine', href: '/projects/siem' },
-      { text: 'Agentic rule proposals at under 2 cents each', href: '/projects/siem' },
-      { text: '4+ security-vendor log sources integrated, full-stack' },
-      { text: 'Live web app modernized with zero disruption' },
+      'Log-source onboarding: ~7 days to minutes',
+      'Triage queue cut 95–97% by an AI correlation engine',
+      'Agentic rule proposals at under 2 cents each',
+      '4+ security-vendor log sources integrated, full-stack',
+      'Live web app modernized with zero disruption',
     ],
+    caseStudy: { href: '/projects/siem', label: 'Read the SIEM case study' },
   },
   {
     title: 'Full-stack Engineer',
     company: 'CNG',
     dates: 'Mar 2022 – Apr 2023',
     highlights: [
-      { text: 'Property-search map app, built leading a team of 3' },
-      { text: 'Property polygons on Mapbox via geospatial vector tiles' },
-      { text: 'Requirements into specs, and code review across the team' },
+      'Property-search map app, built leading a team of 3',
+      'Property polygons on Mapbox via geospatial vector tiles',
+      'Requirements into specs, and code review across the team',
     ],
   },
 ];
@@ -130,7 +132,7 @@ const proof = {
       </div>
       <ol class="experience-list">
         {
-          experience.map(({ title, company, dates, highlights }) => (
+          experience.map(({ title, company, dates, highlights, caseStudy }) => (
             <li class="experience-role">
               <p class="experience-dates">{dates}</p>
               <div class="experience-marker" aria-hidden="true"></div>
@@ -138,8 +140,9 @@ const proof = {
                 <h3>{title}</h3>
                 <p class="experience-company">{company}</p>
                 <ul>
-                  {highlights.map(({ text, href }) => <li>{href ? <a class="inline-link" href={href}>{text}</a> : text}</li>)}
+                  {highlights.map(text => <li>{text}</li>)}
                 </ul>
+                {caseStudy && <a class="inline-link experience-case" href={caseStudy.href}>{caseStudy.label}</a>}
               </div>
             </li>
           ))
