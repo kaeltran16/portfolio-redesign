@@ -41,9 +41,18 @@ const elsewhere = social.filter(s => s !== email);
 const about = [
   'I’m Khang, a full-stack engineer in Ho Chi Minh City. At MozoX I build a multi-tenant security platform, from the React panels analysts use to the Java and Python services behind them, and lately the LLM and ML features in between.',
   'I like owning a feature end to end, and I care most about the tools other engineers use. Outside work that means side projects like Arc, a cockpit for coding agents, and opal, an app I open every morning.',
-  'If you are hiring, building something in this space, or just want to talk shop, my inbox is open.',
 ];
-const contactPitch = 'Open to remote full-stack roles, and always happy to talk about developer tooling.';
+// the stack is the siem case page's, so the two never drift apart
+const siemStack = projects.find(p => p.slug === 'siem')!.facts.find(f => f.label === 'Stack')!.value;
+// draft copy until khang finalizes it
+const aboutFacts: { label: string; value: string }[] = [
+  { label: 'Based in', value: 'Ho Chi Minh City, Vietnam' },
+  { label: 'Working on', value: 'Production AI on a multi-tenant SIEM at MozoX' },
+  { label: 'Stack', value: siemStack },
+  { label: 'Open to', value: 'Remote full-stack roles' },
+];
+// draft copy until khang finalizes it
+const contactPitch = 'If you are hiring, building something in this space, or want to talk shop, email is the quickest way to reach me.';
 
 // draft copy until khang finalizes it
 // split so only the siem words link in the hero, while the description takes the same sentence as plain text
@@ -140,8 +149,20 @@ const proof = {
 
     <section class="about" id="about" aria-labelledby="about-title">
       <h2 class="section-title" id="about-title">About</h2>
-      <div class="prose">
-        {about.map(p => <p>{p}</p>)}
+      <div class="about-body">
+        <div class="prose">
+          {about.map(p => <p>{p}</p>)}
+        </div>
+        <dl class="case-facts about-facts">
+          {
+            aboutFacts.map(({ label, value }) => (
+              <>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </>
+            ))
+          }
+        </dl>
       </div>
     </section>
   </main>

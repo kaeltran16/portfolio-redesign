@@ -1103,6 +1103,19 @@ body {
   }
 }
 
+/* prose left and facts right, stacking at the same breakpoint as the project rows */
+.about-body {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: var(--space3XL);
+  align-items: start;
+
+  @media (max-width: 1040px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spaceXL);
+  }
+}
+
 .contact {
   gap: var(--spaceXL);
   padding-bottom: var(--space2XL);
