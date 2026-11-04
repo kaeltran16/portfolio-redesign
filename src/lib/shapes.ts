@@ -68,6 +68,11 @@ const HALO_MID = 0.85;
 export const VISUAL_FLOOR = -0.55;
 // the visual's own half width; past it sit the rail, the logo, the theme toggle or the title column
 export const TEXT_EDGE = 0.82;
+// between the console's panels and its command box is a gap the visual does not hide: y -0.50 to -0.47 at 1440
+// and -0.35 to -0.29 at 390, where the console keeps its size in a smaller box. the band spans both, with margin
+// for dot size and drift, across the visual's width
+export const CONSOLE_GAP_FLOOR = -0.53;
+export const CONSOLE_GAP_TOP = -0.24;
 // float32 storage rounds 0.7 to just under it, so a part laid on the band's floor sits this far above it
 const FLOOR_MARGIN = 0.02;
 const bandY = (random: Random) => HALO_INNER + FLOOR_MARGIN + random() * (1 - HALO_INNER - FLOOR_MARGIN);
@@ -78,11 +83,11 @@ const LINK_SIZE = 1.8;
 const LINK_GAP = 0.014;
 const BAND_FIELD = 60;
 const FIELD_PRESENCE = 0.6;
-// inside the 0.82 by 0.62 the visual hides, with margin for dot size and drift; the floor stays above the gap
-// between the console and its command box, near -0.42, where a dot would show
+// inside the 0.82 by 0.62 the visual hides, with margin for dot size and drift; the floor stays above the console
+// gap, CONSOLE_GAP_FLOOR to CONSOLE_GAP_TOP, where a dot would show
 const HIDDEN_HALF_WIDTH = 0.74;
 const HIDDEN_TOP = 0.54;
-const HIDDEN_FLOOR = -0.36;
+const HIDDEN_FLOOR = CONSOLE_GAP_TOP;
 
 // a sunflower disc spaces a node's dots evenly whatever their number
 function disc(cx: number, cy: number, radius: number, dots: number): Dot[] {
@@ -135,8 +140,9 @@ const arcGraph = diagram([
   ...LEAVES.flatMap((leaf, k) => dotted(MIDS[k < 2 ? 0 : 1], leaf, NODE_RADIUS)),
 ]);
 
-// lanes run down behind the visual, so the part in the band keeps a light density
-const laneY = (random: Random) => VISUAL_FLOOR + random() * (1 - VISUAL_FLOOR);
+// lanes run down behind the visual, so the part in the band keeps a light density; they stop above the console
+// gap, since below it is only the command box, which a dot faintly shows through
+const laneY = (random: Random) => CONSOLE_GAP_TOP + random() * (1 - CONSOLE_GAP_TOP);
 
 function lane(i: number, random: Random): Point {
   return [LANES[i % LANES.length] + spread(random, LANE_WIDTH), laneY(random), spread(random, DEPTH), 1, 1];
@@ -174,8 +180,12 @@ function stream(random: Random, cy: number, noise: number): Point {
   return [x, cy + WAVE * Math.sin(2.5 * x) + spread(random, noise), spread(random, DEPTH), 1, 1];
 }
 
-// the events spread down behind the visual, so the part in the band stays sparse
-const events: Place = (_, random) => stream(random, 0.2, 0.7);
+// the events spread down behind the visual, so the part in the band stays sparse; their wave stays above the
+// console gap
+const EVENTS_FLOOR = CONSOLE_GAP_TOP + WAVE;
+const EVENTS_TOP = 0.9;
+const events: Place = (_, random) =>
+  stream(random, (EVENTS_FLOOR + EVENTS_TOP) / 2, (EVENTS_TOP - EVENTS_FLOOR) / 2);
 
 // the stream calms and drops to make room for the outlier above it
 const outlier = blob(0.6, 0.94, 0.05);

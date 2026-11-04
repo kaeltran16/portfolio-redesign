@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTrack, HALO_INNER, TEXT_EDGE, VISUAL_FLOOR } from './shapes';
+import { buildTrack, CONSOLE_GAP_FLOOR, CONSOLE_GAP_TOP, HALO_INNER, TEXT_EDGE, VISUAL_FLOOR } from './shapes';
 
 const ROWS = [
   { slug: 'arc', steps: 4 },
@@ -163,6 +163,19 @@ describe('buildTrack', () => {
       ...[1, 2, 3, 4].map(k => `opal-${k}`),
     ];
     for (const name of steps) expect(offText(shapeOf(name)), `${name} has dots over text`).toEqual([]);
+  });
+
+  it.each(COUNTS)('keeps arc and siem dots out of the gap between the console and its command box, at %s', count => {
+    const sized = buildTrack(ROWS, count);
+    const steps = [...[1, 2, 3, 4].map(k => `arc-${k}`), ...[1, 2, 3, 4, 5, 6].map(k => `siem-${k}`)];
+    for (const name of steps) {
+      const shape = shapeOf(name, sized);
+      const inGap = presentIndices(shape).filter(i => {
+        const [x, y] = [shape[i * 4], shape[i * 4 + 1]];
+        return Math.abs(x) <= TEXT_EDGE && y >= CONSOLE_GAP_FLOOR && y <= CONSOLE_GAP_TOP;
+      });
+      expect(inGap, `${name} has dots in the console gap`).toEqual([]);
+    }
   });
 
   it('splits arc workers into lanes and merges them into one trunk', () => {
