@@ -112,6 +112,26 @@ body {
   outline-offset: 4px;
 }
 
+/* a link inside running text: the text keeps the body colour so it holds 4.5:1, the accent underline marks it */
+.inline-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  transition: color var(--durationS) ease;
+
+  &:hover {
+    color: var(--accent);
+  }
+
+  /* thinner and closer than the global ring, so it does not cover the lines above and below */
+  &:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+}
+
 ::selection {
   background: var(--text);
   color: var(--background);
