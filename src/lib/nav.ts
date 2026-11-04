@@ -1,7 +1,7 @@
 // which nav section is current; no dom, so it is unit tested
 
 // a section is current once its top has passed this share of the window height
-export const CURRENT_LINE = 0.4;
+export const CURRENT_LINE = 0.15;
 
 // index of the current section given each section's top in document order, or -1 above the first. at the page's end
 // the last one is current, since a short footer never reaches the line

@@ -2,8 +2,9 @@
 // headless chrome's window cannot go below ~500px wide, so phone sizes need device emulation.
 // usage: node scripts/shots.mjs [outDir]   (dev server on http://localhost:4321, or set BASE_URL;
 // SHOTS_SERVE=1 serves the last build (dist/) itself on a free port instead, so run `npm run build` first;
-// SHOTS=phone-390,role-wipe runs only those). exits 1 on a failed step, and 3 when everything else passed but a
-// gpu step was skipped because chrome had no gpu
+// SHOTS=phone-390,role-wipe runs only those; SHOTS_SKIP=cloud-phone-fps leaves those out, and a name that matches
+// no scenario is an error). exits 1 on a failed step, and 3 when everything else passed but a gpu step was skipped
+// because chrome had no gpu
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -250,12 +251,17 @@ const cloudInRow = (n, slug, k, text = '.project-title') => allOf(cloudShows(`${
 const CAPTIONS = '.scene-captions';
 // share of the screenshot the cloud must change for these scenes to count as showing it
 const CLOUD_SEEN = {
+  'scene-arc-1': 0.002,
+  'scene-arc-1-light': 0.002,
   'scene-arc-2': 0.002,
   'scene-siem-3': 0.001,
   'scene-siem-4': 0.001,
   'scene-siem-5': 0.001,
   'scene-siem-6': 0.001,
   'scene-siem-3-light': 0.002,
+  'scene-opal-1': 0.001,
+  'scene-opal-2': 0.001,
+  'scene-opal-3': 0.001,
   'scene-opal-2-phone-390': 0.002,
 };
 
@@ -264,6 +270,7 @@ const sceneText = '.scene-captions li span';
 const sceneScenarios = [
   ...[1, 2, 3, 4].map(k => [ARC, 'arc', k, false]),
   ...[1, 2, 3, 4, 5, 6].map(k => [SIEM, 'siem', k, false]),
+  [ARC, 'arc', 1, true],
   [ARC, 'arc', 2, true],
   [SIEM, 'siem', 3, true],
 ].map(([n, slug, k, light]) => {
@@ -278,14 +285,18 @@ const sceneScenarios = [
     step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 4 : 6}, ${light ? 'light' : 'dark'}: row pinned, only panel ${k} lit and its command in the box, only caption ${k} shown, text at 4.5:1 or more, the cloud on ${slug}-${k} beneath the title${CLOUD_SEEN[name] ? ' and visible' : ''}`,
   };
 });
-const opalScenarios = [[1, false], [2, false], [3, false], [4, false], [2, true]].map(([k, light]) => ({
-  name: `scene-opal-${k}${light ? '-light' : ''}`,
-  viewport: desktop,
-  waitMs: 1000,
-  eval: light ? `${toggleTheme}; ${toStep(OPAL, k)}` : toStep(OPAL, k),
-  check: allOf(pinned(OPAL), showsScreen(OPAL, k), readable(row(OPAL), `${sceneText}, .phone-names li`), cloudInRow(OPAL, 'opal', k)),
-  step: `opal scene scrolled to step ${k} of 4, ${light ? 'light' : 'dark'}: row pinned, only screen ${k} in the phone, only its name marked and its caption shown, text at 4.5:1 or more, the cloud on opal-${k} beneath the title`,
-}));
+const opalScenarios = [[1, false], [2, false], [3, false], [4, false], [2, true]].map(([k, light]) => {
+  const name = `scene-opal-${k}${light ? '-light' : ''}`;
+  return {
+    name,
+    viewport: desktop,
+    waitMs: 1000,
+    eval: light ? `${toggleTheme}; ${toStep(OPAL, k)}` : toStep(OPAL, k),
+    check: allOf(pinned(OPAL), showsScreen(OPAL, k), readable(row(OPAL), `${sceneText}, .phone-names li`), cloudInRow(OPAL, 'opal', k)),
+    cloudVisible: CLOUD_SEEN[name],
+    step: `opal scene scrolled to step ${k} of 4, ${light ? 'light' : 'dark'}: row pinned, only screen ${k} in the phone, only its name marked and its caption shown, text at 4.5:1 or more, the cloud on opal-${k} beneath the title${CLOUD_SEEN[name] ? ' and visible' : ''}`,
+  };
+});
 const steadyScenarios = [[ARC, 'arc'], [SIEM, 'siem'], [OPAL, 'opal']].map(([n, slug]) => ({
   name: `scene-${slug}-steady`,
   viewport: desktop,
@@ -370,6 +381,92 @@ const rolesAre = want => `(() => {
   return errors.join('; ');
 })()`;
 const drawing = on => `document.querySelector('.experience-list').hasAttribute('data-drawing') === ${on} ? '' : 'timeline ${on ? 'does not draw' : 'draws'}'`;
+
+// --- content: the hero proof line, one-line Experience bullets, About facts, Contact and the share preview.
+// each check returns an error string or ''. offsetHeight measures layout, so the entrance transforms do not skew it
+const linesKit = `
+  const lines = el => Math.round(el.offsetHeight / parseFloat(getComputedStyle(el).lineHeight));
+  const linkTo = '.inline-link[href="/projects/siem"]';
+`;
+const heroProof = maxLines => `(() => {
+  ${linesKit}
+  const pitch = document.querySelector('.intro-pitch');
+  const p = pitch.querySelector('p');
+  const button = pitch.querySelector('.button');
+  const errors = [];
+  if (lines(p) > ${maxLines}) errors.push('proof line is ' + lines(p) + ' lines, over ${maxLines}');
+  if (!pitch.querySelector('a' + linkTo)) errors.push('proof line has no link to /projects/siem');
+  if (button.getBoundingClientRect().top < p.getBoundingClientRect().bottom - 0.5) errors.push('Download CV is not below the proof line');
+  return errors.join('; ');
+})()`;
+const oneLiners = maxLines => `(() => {
+  ${linesKit}
+  const errors = [];
+  const long = [...document.querySelectorAll('.experience-body li')].find(li => lines(li) > ${maxLines});
+  if (long) errors.push('bullet "' + long.textContent.trim() + '" is ' + lines(long) + ' lines, over ${maxLines}');
+  const linked = document.querySelectorAll('.experience-role:first-of-type li ' + linkTo).length;
+  if (linked !== 3) errors.push('the first role has ' + linked + ' bullets linked to /projects/siem, not 3');
+  return errors.join('; ');
+})()`;
+const ABOUT_FACTS = ['Based in', 'Working on', 'Stack', 'Open to'];
+const aboutLayout = stacked => `(() => {
+  const errors = [];
+  const paragraphs = document.querySelectorAll('#about .prose p').length;
+  if (paragraphs !== 2) errors.push('about has ' + paragraphs + ' paragraphs, not 2');
+  const labels = [...document.querySelectorAll('#about .about-facts dt')].map(dt => dt.textContent.trim());
+  if (labels.join() !== ${JSON.stringify(ABOUT_FACTS.join())}) errors.push('about facts are [' + labels.join(', ') + '], not [${ABOUT_FACTS.join(', ')}]');
+  const facts = document.querySelector('#about .about-facts')?.getBoundingClientRect();
+  const prose = document.querySelector('#about .prose').getBoundingClientRect();
+  if (!facts) return errors.concat('about has no .about-facts list').join('; ');
+  if (${stacked}) {
+    if (facts.top < prose.bottom - 0.5) errors.push('facts start at ' + Math.round(facts.top) + 'px, above the text end at ' + Math.round(prose.bottom) + 'px, not stacked');
+  } else {
+    if (facts.left < prose.right - 0.5) errors.push('facts start at ' + Math.round(facts.left) + 'px, left of the text end at ' + Math.round(prose.right) + 'px, not beside it');
+    if (facts.top >= prose.bottom || prose.top >= facts.bottom) errors.push('facts and text do not share a row');
+  }
+  return errors.join('; ');
+})()`;
+// the contact pitch must not repeat what About already says: not its Open to fact, not one of its paragraphs
+const contactTrimmed = `(() => {
+  const label = [...document.querySelectorAll('#about dt')].find(dt => dt.textContent.trim() === 'Open to');
+  const fact = label?.nextElementSibling?.textContent.trim().toLowerCase();
+  if (!fact) return 'about has no Open to fact, so the contact pitch cannot be compared';
+  const pitch = document.querySelector('.contact-pitch').textContent.trim().toLowerCase();
+  const errors = [];
+  if (pitch.includes(fact)) errors.push('contact pitch repeats the Open to fact');
+  if ([...document.querySelectorAll('#about .prose p')].some(p => p.textContent.trim().toLowerCase() === pitch)) errors.push('contact pitch equals an about paragraph');
+  return errors.join('; ');
+})()`;
+const shareTags = `(() => {
+  const meta = selector => document.querySelector(selector)?.content;
+  const errors = [];
+  if (meta('meta[property="og:title"]') !== document.title) errors.push('og:title is ' + meta('meta[property="og:title"]') + ', not the page title ' + document.title);
+  if (meta('meta[property="og:description"]') !== meta('meta[name="description"]')) errors.push('og:description is not the page description');
+  if (meta('meta[name="twitter:card"]') !== 'summary_large_image') errors.push('twitter:card is ' + meta('meta[name="twitter:card"]') + ', not summary_large_image');
+  const absolute = value => /^https?:\\/\\//.test(value ?? '') ? new URL(value) : undefined;
+  const image = meta('meta[property="og:image"]');
+  if (!image) errors.push('og:image missing; build with --site or set site in astro.config.mjs');
+  else if (absolute(image)?.pathname !== '/og.png') errors.push('og:image is ' + image + ', not an absolute URL ending /og.png');
+  const url = meta('meta[property="og:url"]');
+  const trim = path => path.replace(/\\/+$/, '');
+  if (!url) errors.push('og:url missing; build with --site or set site in astro.config.mjs');
+  else if (!absolute(url) || trim(absolute(url).pathname) !== trim(location.pathname)) errors.push('og:url is ' + url + ', not an absolute URL for ' + location.pathname);
+  return errors.join('; ');
+})()`;
+const shareImage = `(async () => {
+  const img = new Image();
+  img.src = new URL('/og.png', location.origin).href;
+  try {
+    await img.decode();
+  } catch {
+    return '/og.png does not load';
+  }
+  return img.naturalWidth === 1200 && img.naturalHeight === 630 ? '' : '/og.png is ' + img.naturalWidth + 'x' + img.naturalHeight + ', not 1200x630';
+})()`;
+const introPitchShown = `(() => {
+  const opacity = getComputedStyle(document.querySelector('.intro-pitch')).opacity;
+  return opacity === '1' ? '' : 'proof line opacity is ' + opacity + ', not 1';
+})()`;
 
 // --- nav: each check returns an error string or ''
 const NAV_IDS = ['projects', 'experience', 'about', 'contact'];
@@ -609,6 +706,7 @@ const SCENARIOS = [
   })),
   { name: 'header-desktop-scrolled', viewport: desktop, waitMs: 500, eval: showTitle, check: noHeaderBar, step: 'scrolled at 1440px: no header strip' },
   { name: 'nav-current', viewport: desktop, waitMs: 1000, check: navCurrent, step: 'scrolling to each section marks only its rail and menu link current, none at the top, contact at the end' },
+  { name: 'nav-current-tall', viewport: { ...desktop, height: 1300 }, waitMs: 1000, check: navCurrent, step: 'at 1440x1300: scrolling to each section marks only its rail and menu link current, none at the top, contact at the end' },
   { name: 'nav-jumps', viewport: desktop, waitMs: 1000, check: navJumps(false), step: 'each rail link jumps to its section: target set, heading on screen with its cue, no history entries added' },
   {
     name: 'nav-cue-reduced-motion',
@@ -834,10 +932,25 @@ const SCENARIOS = [
     step: 'scenes under reduced motion: no steps, every console panel lit, pulses still, every caption listed, no command box, the phone on its first screen with no names',
   },
   ...[
-    ['experience', 'h2, h3, .experience-dates, .experience-company, .experience-body li'],
-    ['about', 'h2, .prose p'],
-    ['contact', 'h2, .contact-pitch, .contact-links a, .contact-meta'],
-  ].flatMap(([id, text]) => [
+    {
+      id: 'experience',
+      text: 'h2, h3, .experience-dates, .experience-company, .experience-body li, .inline-link',
+      check: ({ width }) => oneLiners(width >= 1440 ? 1 : 2),
+      claims: ({ width }) => `${width >= 1440 ? 'every bullet one line' : 'every bullet at most two lines'}, the three AI bullets link to the SIEM page`,
+    },
+    {
+      id: 'about',
+      text: 'h2, .prose p, .about-facts dt, .about-facts dd',
+      check: ({ width }) => aboutLayout(width <= 1040),
+      claims: ({ width }) => `two paragraphs, the four facts ${width <= 1040 ? 'stacked under' : 'beside'} the text`,
+    },
+    {
+      id: 'contact',
+      text: 'h2, .contact-pitch, .contact-links a, .contact-meta',
+      check: () => contactTrimmed,
+      claims: () => 'the pitch repeats nothing from About',
+    },
+  ].flatMap(({ id, text, check, claims }) => [
     [id, desktop, false],
     [`${id}-light`, desktop, true],
     [`${id}-phone-390`, phone, false],
@@ -847,10 +960,55 @@ const SCENARIOS = [
     viewport,
     waitMs: 1500,
     eval: light ? `${toggleTheme}; ${show(id)}` : show(id),
-    check: readable(`#${id}`, text),
+    check: allOf(readable(`#${id}`, text), check(viewport)),
     clip: `#${id}`,
-    step: `${id} section at ${viewport.width}px, ${light ? 'light' : 'dark'}: fits the width, text at 4.5:1 or more`,
+    step: `${id} section at ${viewport.width}px, ${light ? 'light' : 'dark'}: fits the width, text at 4.5:1 or more, ${claims(viewport)}`,
   }))),
+  ...[
+    ['hero-proof', desktop, false],
+    ['hero-proof-light', desktop, true],
+    ['hero-proof-phone-390', phone, false],
+    ['hero-proof-phone-390-light', phone, true],
+  ].map(([name, viewport, light]) => ({
+    name,
+    viewport,
+    waitMs: 6000,
+    eval: light ? toggleTheme : undefined,
+    check: allOf(heroProof(viewport.width >= 1440 ? 2 : Infinity), readable('.intro-pitch', 'p, .inline-link')),
+    step: `hero proof line at ${viewport.width}px, ${light ? 'light' : 'dark'}: at most two lines (1440 only), SIEM linked to /projects/siem, Download CV below it, text at 4.5:1 or more`,
+  })),
+  // :hover in the selector also fails the check when the mouse missed the link
+  ...[
+    ['hero-proof-hover', false],
+    ['hero-proof-hover-light', true],
+  ].map(([name, light]) => ({
+    name,
+    viewport: desktop,
+    waitMs: 6000,
+    eval: light ? toggleTheme : undefined,
+    hover: '.intro-pitch .inline-link',
+    check: readable('.intro-pitch', '.inline-link:hover'),
+    step: `hero SIEM link hovered at 1440px, ${light ? 'light' : 'dark'}: its text stays at 4.5:1 or more`,
+  })),
+  ...[
+    ['share-tags', ''],
+    ['share-tags-case', 'projects/siem'],
+  ].map(([name, page]) => ({
+    name,
+    viewport: desktop,
+    page,
+    waitMs: 300,
+    check: shareTags,
+    step: `${page || 'home'} head: og:title is the page title, og:description its description, twitter:card summary_large_image, og:image an absolute /og.png URL, og:url absolute for this page`,
+  })),
+  { name: 'share-image', viewport: desktop, waitMs: 300, check: shareImage, step: 'the served /og.png is a 1200x630 image' },
+  {
+    name: 'og',
+    viewport: { width: 1200, height: 630, deviceScaleFactor: 1, mobile: false },
+    waitMs: 7000,
+    check: allOf(titleFits, cloudShows('sphere'), introPitchShown),
+    step: 'Home first screen at 1200x630 for the share image: title fits, sphere drawn, proof line shown',
+  },
   {
     name: 'experience-focus',
     viewport: desktop,
@@ -1078,6 +1236,20 @@ const SCENARIOS = [
     step: 'siem row scrolled into view under reduced motion: the cloud redraws on scroll with a siem shape, and nothing requests an animation frame for a second',
   },
   {
+    name: 'cloud-opal-reduced-motion',
+    viewport: desktop,
+    waitMs: 1000,
+    reduced: true,
+    eval: `(async () => {
+      await ${cloudStarted};
+      document.querySelector('${row(OPAL)} .project-visual').scrollIntoView({ block: 'center', behavior: 'instant' });
+    })()`,
+    // cloudShows matches whole names only, and a still page may rest on any opal step
+    check: `(() => { const shape = ${cloudShape}; return shape?.startsWith('opal-') ? '' : 'cloud shows ' + shape + ' with the opal row in view'; })()`,
+    clip: row(OPAL),
+    step: 'opal row under reduced motion: the cloud draws a still opal frame with no patch beside the phone',
+  },
+  {
     name: 'cloud-no-webgl',
     viewport: desktop,
     waitMs: 1000,
@@ -1125,7 +1297,13 @@ const clipOf = selector => `(() => {
 })()`;
 
 const only = process.env.SHOTS?.split(',');
-const selected = only ? SCENARIOS.filter(s => only.includes(s.name)) : SCENARIOS;
+const skipped = process.env.SHOTS_SKIP?.split(',').filter(Boolean) ?? [];
+const unknownSkips = skipped.filter(name => !SCENARIOS.some(s => s.name === name));
+if (unknownSkips.length) {
+  console.error(`SHOTS_SKIP names no scenario: ${unknownSkips.join(', ')}`);
+  process.exit(1);
+}
+const selected = SCENARIOS.filter(s => (!only || only.includes(s.name)) && !skipped.includes(s.name));
 
 if (!CHROME) {
   console.log('no chrome found; set CHROME to its path');
@@ -1256,6 +1434,10 @@ async function run({ send, listeners }, s) {
     }
     // a real wheel through the input pipeline: a synthetic WheelEvent never scrolls anything natively.
     // `after` runs at once, to act while the scroll it starts is still under way
+    if (s.hover) {
+      const { result } = await send('Runtime.evaluate', { expression: centreOf(s.hover), returnByValue: true }, sessionId);
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...result.value }, sessionId);
+    }
     if (s.wheel) {
       const { result } = await send('Runtime.evaluate', { expression: centreOf(s.wheel.at), returnByValue: true }, sessionId);
       await send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...result.value, deltaX: 0, deltaY: s.wheel.deltaY }, sessionId);

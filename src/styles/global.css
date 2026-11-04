@@ -112,6 +112,26 @@ body {
   outline-offset: 4px;
 }
 
+/* a link inside running text: the text keeps the body colour so it holds 4.5:1, the accent underline marks it.
+   hover thickens the underline rather than turning the text accent, which drops to about 2.4:1 in the light theme */
+.inline-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+
+  &:hover {
+    text-decoration-thickness: 3px;
+  }
+
+  /* thinner and closer than the global ring, so it does not cover the lines above and below */
+  &:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+}
+
 ::selection {
   background: var(--text);
   color: var(--background);
@@ -1083,7 +1103,23 @@ body {
   }
 }
 
+/* prose left and facts right, stacking at the same breakpoint as the project rows */
+.about-body {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: var(--space3XL);
+  align-items: start;
+
+  @media (max-width: 1040px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spaceXL);
+  }
+}
+
 .contact {
+  /* a full window below the last section, so it can reach the top and every nav jump lands its section there.
+     lvh, as the nav measures against innerHeight, which grows to the large viewport when phone bars hide */
+  min-height: 100lvh;
   gap: var(--spaceXL);
   padding-bottom: var(--space2XL);
 }
