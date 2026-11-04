@@ -251,12 +251,17 @@ const cloudInRow = (n, slug, k, text = '.project-title') => allOf(cloudShows(`${
 const CAPTIONS = '.scene-captions';
 // share of the screenshot the cloud must change for these scenes to count as showing it
 const CLOUD_SEEN = {
+  'scene-arc-1': 0.002,
+  'scene-arc-1-light': 0.002,
   'scene-arc-2': 0.002,
   'scene-siem-3': 0.001,
   'scene-siem-4': 0.001,
   'scene-siem-5': 0.001,
   'scene-siem-6': 0.001,
   'scene-siem-3-light': 0.002,
+  'scene-opal-1': 0.001,
+  'scene-opal-2': 0.001,
+  'scene-opal-3': 0.001,
   'scene-opal-2-phone-390': 0.002,
 };
 
@@ -265,6 +270,7 @@ const sceneText = '.scene-captions li span';
 const sceneScenarios = [
   ...[1, 2, 3, 4].map(k => [ARC, 'arc', k, false]),
   ...[1, 2, 3, 4, 5, 6].map(k => [SIEM, 'siem', k, false]),
+  [ARC, 'arc', 1, true],
   [ARC, 'arc', 2, true],
   [SIEM, 'siem', 3, true],
 ].map(([n, slug, k, light]) => {
@@ -279,14 +285,18 @@ const sceneScenarios = [
     step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 4 : 6}, ${light ? 'light' : 'dark'}: row pinned, only panel ${k} lit and its command in the box, only caption ${k} shown, text at 4.5:1 or more, the cloud on ${slug}-${k} beneath the title${CLOUD_SEEN[name] ? ' and visible' : ''}`,
   };
 });
-const opalScenarios = [[1, false], [2, false], [3, false], [4, false], [2, true]].map(([k, light]) => ({
-  name: `scene-opal-${k}${light ? '-light' : ''}`,
-  viewport: desktop,
-  waitMs: 1000,
-  eval: light ? `${toggleTheme}; ${toStep(OPAL, k)}` : toStep(OPAL, k),
-  check: allOf(pinned(OPAL), showsScreen(OPAL, k), readable(row(OPAL), `${sceneText}, .phone-names li`), cloudInRow(OPAL, 'opal', k)),
-  step: `opal scene scrolled to step ${k} of 4, ${light ? 'light' : 'dark'}: row pinned, only screen ${k} in the phone, only its name marked and its caption shown, text at 4.5:1 or more, the cloud on opal-${k} beneath the title`,
-}));
+const opalScenarios = [[1, false], [2, false], [3, false], [4, false], [2, true]].map(([k, light]) => {
+  const name = `scene-opal-${k}${light ? '-light' : ''}`;
+  return {
+    name,
+    viewport: desktop,
+    waitMs: 1000,
+    eval: light ? `${toggleTheme}; ${toStep(OPAL, k)}` : toStep(OPAL, k),
+    check: allOf(pinned(OPAL), showsScreen(OPAL, k), readable(row(OPAL), `${sceneText}, .phone-names li`), cloudInRow(OPAL, 'opal', k)),
+    cloudVisible: CLOUD_SEEN[name],
+    step: `opal scene scrolled to step ${k} of 4, ${light ? 'light' : 'dark'}: row pinned, only screen ${k} in the phone, only its name marked and its caption shown, text at 4.5:1 or more, the cloud on opal-${k} beneath the title${CLOUD_SEEN[name] ? ' and visible' : ''}`,
+  };
+});
 const steadyScenarios = [[ARC, 'arc'], [SIEM, 'siem'], [OPAL, 'opal']].map(([n, slug]) => ({
   name: `scene-${slug}-steady`,
   viewport: desktop,
@@ -1210,6 +1220,20 @@ const SCENARIOS = [
       return shape?.startsWith('siem-') ? '' : 'cloud shows ' + shape + ' with the siem row in view';
     })()`,
     step: 'siem row scrolled into view under reduced motion: the cloud redraws on scroll with a siem shape, and nothing requests an animation frame for a second',
+  },
+  {
+    name: 'cloud-opal-reduced-motion',
+    viewport: desktop,
+    waitMs: 1000,
+    reduced: true,
+    eval: `(async () => {
+      await ${cloudStarted};
+      document.querySelector('${row(OPAL)} .project-visual').scrollIntoView({ block: 'center', behavior: 'instant' });
+    })()`,
+    // cloudShows matches whole names only, and a still page may rest on any opal step
+    check: `(() => { const shape = ${cloudShape}; return shape?.startsWith('opal-') ? '' : 'cloud shows ' + shape + ' with the opal row in view'; })()`,
+    clip: row(OPAL),
+    step: 'opal row under reduced motion: the cloud draws a still opal frame with no patch beside the phone',
   },
   {
     name: 'cloud-no-webgl',

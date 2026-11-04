@@ -39,7 +39,7 @@ type Rect = { left: number; top: number; width: number; height: number };
 
 // a shape spreads past its target's box so it halos the scene instead of hiding under it
 export const CLOUD_SPREAD = 1.6;
-// css px; nearer dots draw up to DEPTH_SIZE larger
+// css px for a dot of size 1; nearer dots draw up to DEPTH_SIZE larger
 const POINT_SIZE = 3;
 const DEPTH_SIZE = 0.5;
 // share of the dissolve over which the dots fade in on the sphere's surface
@@ -100,6 +100,8 @@ uniform float uPush;
 uniform float uFade;
 attribute vec4 aFrom;
 attribute vec4 aTo;
+attribute float aFromSize;
+attribute float aToSize;
 varying float vAlpha;
 ${noiseGlsl}
 
@@ -140,7 +142,7 @@ void main() {
   float gap = length(away);
   px += uPush * PUSH_PX * (1.0 - smoothstep(0.0, PUSH_RADIUS, gap)) * away / max(gap, 1.0);
   vAlpha = mix(aFrom.w, aTo.w, uMorph) * uFade;
-  gl_PointSize = POINT_SIZE * (1.0 + DEPTH_SIZE * mix(from.z, to.z, uMorph));
+  gl_PointSize = POINT_SIZE * mix(aFromSize, aToSize, uMorph) * (1.0 + DEPTH_SIZE * mix(from.z, to.z, uMorph));
   gl_Position = vec4(px / uViewport * vec2(2.0, -2.0) + vec2(-1.0, 1.0), 0.0, 1.0);
 }
 `;
@@ -192,7 +194,7 @@ export function startCloud(
   const context = canvas.getContext('webgl2', CONTEXT_ATTRIBUTES);
   if (!context) throw new Error('webgl unavailable');
   const { mode } = options;
-  const track = buildTrack(options.rows, mode.count);
+  const track = buildTrack(options.rows, mode.count, { still: !mode.live });
 
   const renderer = new WebGLRenderer({ canvas, context });
   renderer.setPixelRatio(1);
@@ -210,9 +212,11 @@ export function startCloud(
   const ambient = new AmbientLight(0xffffff);
   scene.add(sphere, directional, ambient);
 
-  const vec4Attribute = () => new BufferAttribute(new Float32Array(mode.count * 4), 4).setUsage(DynamicDrawUsage);
-  const from = vec4Attribute();
-  const to = vec4Attribute();
+  const dynamic = (size: number) => new BufferAttribute(new Float32Array(mode.count * size), size).setUsage(DynamicDrawUsage);
+  const from = dynamic(4);
+  const to = dynamic(4);
+  const fromSize = dynamic(1);
+  const toSize = dynamic(1);
   const phases = new Float32Array(mode.count * 3).map(() => Math.random() * Math.PI * 2);
   const geometry = new BufferGeometry();
   // three sizes the draw from position, so it carries the drift phases rather than a place; it has all three
@@ -220,6 +224,8 @@ export function startCloud(
   geometry.setAttribute('position', new BufferAttribute(phases, 3));
   geometry.setAttribute('aFrom', from);
   geometry.setAttribute('aTo', to);
+  geometry.setAttribute('aFromSize', fromSize);
+  geometry.setAttribute('aToSize', toSize);
 
   const uniforms = {
     time,
@@ -268,8 +274,9 @@ export function startCloud(
   const load = (index: number, next: number) => {
     from.copyArray(track.shapes[index]);
     to.copyArray(track.shapes[next]);
-    from.needsUpdate = true;
-    to.needsUpdate = true;
+    fromSize.copyArray(track.sizes[index]);
+    toSize.copyArray(track.sizes[next]);
+    for (const attribute of [from, to, fromSize, toSize]) attribute.needsUpdate = true;
     loaded = index;
   };
 
