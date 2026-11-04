@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTrack, HALO_INNER } from './shapes';
+import { buildTrack, HALO_INNER, TEXT_EDGE, VISUAL_FLOOR } from './shapes';
 
 const ROWS = [
   { slug: 'arc', steps: 4 },
@@ -92,6 +92,16 @@ describe('buildTrack', () => {
     const shape = shapeOf('siem-3');
     const outside = presentIndices(shape).filter(i => inHalo(shape, i));
     expect(outside.length / COUNT).toBeGreaterThanOrEqual(0.8);
+  });
+
+  // below the visual sits the step caption, beside it the rail or the row's title column
+  it('keeps arc and siem dots clear of the caption and the title column', () => {
+    const steps = [...[1, 2, 3, 4].map(k => `arc-${k}`), ...[1, 2, 3, 4, 5, 6].map(k => `siem-${k}`)];
+    for (const name of steps) {
+      const shape = shapeOf(name);
+      const strays = presentIndices(shape).filter(i => shape[i * 4 + 1] < VISUAL_FLOOR || Math.abs(shape[i * 4]) > TEXT_EDGE);
+      expect(strays, `${name} has dots over text`).toEqual([]);
+    }
   });
 
   it('splits arc workers into lanes and merges them into one trunk', () => {

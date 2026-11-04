@@ -80,30 +80,47 @@ function kept(previous: Float32Array, i: number): Point {
   return [previous[i * 4], previous[i * 4 + 1], previous[i * 4 + 2], 0];
 }
 
+// a shape is drawn behind its row's visual, which hides shape space out to about 0.82 by 0.62; the step caption
+// sits below the visual, and the rail or the row's title column beside it. so arc and siem show in the band above
+// the visual, from HALO_INNER to 1, which also clears 1 / CLOUD_SPREAD with margin for dot size and drift
+export const HALO_INNER = 0.7;
+const HALO_MID = 0.85;
+// a dot stays above this, where it is either in the band or hidden by the visual; the caption starts near -0.68
+export const VISUAL_FLOOR = -0.55;
+// the visual's own half width; past it sit the rail, the logo, the theme toggle or the title column
+export const TEXT_EDGE = 0.82;
+// float32 storage rounds 0.7 to just under it, so a part laid on the band's floor sits this far above it
+const FLOOR_MARGIN = 0.02;
+
 // arc: lanes are the git worktrees; the leaves of the task graph sit where the lanes will run
 const LANES = [-0.75, -0.25, 0.25, 0.75];
 const LANE_WIDTH = 0.05;
-const LEAF_Y = -0.75;
+const ROOT_Y = 0.95;
+const LEAF_Y = 0.75;
+const NODE_RADIUS = 0.04;
 
 const arcGraph = parts(
-  blob(0, 0.75, 0.12),
-  blob(-0.5, 0, 0.1),
-  blob(0.5, 0, 0.1),
-  ...LANES.map(x => blob(x, LEAF_Y, 0.08)),
-  segment(0, 0.75, -0.5, 0),
-  segment(0, 0.75, 0.5, 0),
-  segment(-0.5, 0, LANES[0], LEAF_Y),
-  segment(-0.5, 0, LANES[1], LEAF_Y),
-  segment(0.5, 0, LANES[2], LEAF_Y),
-  segment(0.5, 0, LANES[3], LEAF_Y),
+  blob(0, ROOT_Y, NODE_RADIUS),
+  blob(-0.45, HALO_MID, NODE_RADIUS),
+  blob(0.45, HALO_MID, NODE_RADIUS),
+  ...LANES.map(x => blob(x, LEAF_Y, NODE_RADIUS * 0.8)),
+  segment(0, ROOT_Y, -0.45, HALO_MID),
+  segment(0, ROOT_Y, 0.45, HALO_MID),
+  segment(-0.45, HALO_MID, LANES[0], LEAF_Y),
+  segment(-0.45, HALO_MID, LANES[1], LEAF_Y),
+  segment(0.45, HALO_MID, LANES[2], LEAF_Y),
+  segment(0.45, HALO_MID, LANES[3], LEAF_Y),
 );
 
+// lanes run down behind the visual, so the part in the band keeps a light density
+const laneY = (random: Random) => VISUAL_FLOOR + random() * (1 - VISUAL_FLOOR);
+
 function lane(i: number, random: Random): Point {
-  return [LANES[i % LANES.length] + spread(random, LANE_WIDTH), spread(random, 1), spread(random, DEPTH), 1];
+  return [LANES[i % LANES.length] + spread(random, LANE_WIDTH), laneY(random), spread(random, DEPTH), 1];
 }
 
 const ASK_LANE = LANES.length - 1;
-const askBlob = blob(0.55, 0.45, 0.2);
+const askBlob = blob(0.5, HALO_MID, 0.12);
 
 function ask(i: number, random: Random): Point {
   if (i % LANES.length !== ASK_LANE) return lane(i, random);
@@ -112,36 +129,34 @@ function ask(i: number, random: Random): Point {
   return [x, y, FORWARD + spread(random, DEPTH), 1];
 }
 
-// lanes converge over the top half and run as one trunk below it
+// lanes converge from the top of the band and run into the visual as one trunk; all in the band, so the
+// converging lines stay dense
+const MERGE_Y = 0.82;
+const bandY = (random: Random) => HALO_INNER + FLOOR_MARGIN + random() * (1 - HALO_INNER - FLOOR_MARGIN);
 function merge(i: number, random: Random): Point {
-  const y = spread(random, 1);
-  const x = LANES[i % LANES.length] * Math.max(0, y) + spread(random, LANE_WIDTH);
+  const y = bandY(random);
+  const x = LANES[i % LANES.length] * Math.max(0, (y - MERGE_Y) / (1 - MERGE_Y)) + spread(random, LANE_WIDTH);
   return [x, y, spread(random, DEPTH), 1];
 }
-
-// a shape is drawn behind its row's visual, and the opaque siem console covers shape space out to
-// 1 / CLOUD_SPREAD on the box's shorter axis; beyond this a point shows, with margin for dot size and drift
-export const HALO_INNER = 0.7;
-// the band above the console: below it sits the step caption, and a phone cuts off the sides
-const HALO_MID = 0.85;
-// the answer ring frames the console; at this radius its diagonals (radius / sqrt 2) still clear HALO_INNER
-const ANSWER_RADIUS = 1;
 
 // siem: survivors are fixed by index, so the triage cut keeps the particles that were
 // already the outlier and the chain
 const SIEM_CLUSTERS: [number, number][] = [[-0.7, 0.82], [-0.35, 0.92], [0, 0.82], [0.35, 0.92], [0.7, 0.82]];
 const CLUSTER_RADIUS = 0.08;
+const WAVE = 0.03;
 
-function stream(random: Random, noise: number): Point {
-  const x = spread(random, 1);
-  return [x, 0.3 * Math.sin(2.5 * x) + spread(random, noise), spread(random, DEPTH), 1];
+function stream(random: Random, cy: number, noise: number): Point {
+  const x = spread(random, TEXT_EDGE);
+  return [x, cy + WAVE * Math.sin(2.5 * x) + spread(random, noise), spread(random, DEPTH), 1];
 }
 
-const events: Place = (_, random) => stream(random, 0.45);
+// the events spread down behind the visual, so the part in the band stays sparse
+const events: Place = (_, random) => stream(random, 0.2, 0.7);
 
-const outlier = blob(0.6, HALO_MID, 0.08);
+// the stream calms and drops to make room for the outlier above it
+const outlier = blob(0.6, 0.94, 0.05);
 const risk: Place = (i, random) => {
-  if (i % OUTLIER_EVERY !== 0) return stream(random, 0.2);
+  if (i % OUTLIER_EVERY !== 0) return stream(random, 0.8, 0.03);
   const [x, y] = outlier(random);
   return [x, y, spread(random, DEPTH), 1];
 };
@@ -163,7 +178,13 @@ const alerts: Place = (i, random, previous) => {
   return [x, y, FORWARD + spread(random, DEPTH), 1];
 };
 
-const answer = ring(0, 0, ANSWER_RADIUS);
+// the answer arches over the visual, framing it from above
+const ARCH_HALF_WIDTH = 0.8;
+const archBase = HALO_INNER + FLOOR_MARGIN;
+const answer: Part = random => {
+  const angle = random() * Math.PI;
+  return [Math.cos(angle) * ARCH_HALF_WIDTH, archBase + Math.sin(angle) * (1 - archBase - FLOOR_MARGIN)];
+};
 const agent: Place = (i, random, previous) => {
   if (!isSurvivor(i)) return kept(previous, i);
   const [x, y] = answer(random);
