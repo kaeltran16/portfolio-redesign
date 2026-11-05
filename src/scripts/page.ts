@@ -1,20 +1,9 @@
-import {
-  canPin,
-  cloudMode,
-  fillFraction,
-  pinProgress,
-  pinSpan,
-  READING_LINE,
-  revealProgress,
-  revealSpan,
-  stepAt,
-  trackAnchors,
-} from '../lib/scene';
-import type { Cloud, Theme } from './cloud';
+import { canPin, fillFraction, pinProgress, READING_LINE, revealProgress, stepAt } from '../lib/scene';
 import { decode } from './decoder';
 import { reduceMotion } from './motion';
 import './reveal';
 import './smooth';
+import type { Sphere, Theme } from './sphere';
 
 // timings from hamishw.com's intro.jsx: words cycle every 5s, enter over 3s, exit over 2s
 const ROLE_INTERVAL = 5000;
@@ -106,15 +95,27 @@ window.addEventListener('resize', fitTitle);
 document.fonts.addEventListener('loadingdone', fitTitle);
 fitTitle();
 
-// --- theme -------------------------------------------------------------------------------------
+// --- sphere ------------------------------------------------------------------------------------
 
 let theme = (root.dataset.theme as Theme) || 'dark';
-let cloud: Cloud | undefined;
+let sphere: Sphere | undefined;
+
+// lazy, as in the original: three.js stays out of the first paint
+import('./sphere')
+  .then(({ startSphere }) => {
+    const canvas = $<HTMLCanvasElement>('[data-sphere]');
+    sphere = startSphere(canvas, theme, !reduceMotion);
+    requestAnimationFrame(() => (canvas.dataset.visible = 'true'));
+  })
+  // a missing gpu is the visitor's environment, not a site bug, so it warns rather than errors
+  .catch(error => console.warn('sphere failed to start; the intro shows without it', error));
+
+// --- theme -------------------------------------------------------------------------------------
 
 // the toggle itself is in theme.ts, shared with the case-study pages
 document.addEventListener('themechange', () => {
   theme = root.dataset.theme as Theme;
-  cloud?.setTheme(theme);
+  sphere?.setTheme(theme);
   // the original replays the whole intro on a theme change
   playIntro();
 });
@@ -150,7 +151,6 @@ function measureScenes() {
     window.scrollTo({ top: scrollTop, behavior: 'instant' });
   }
   updateScenes();
-  measureCloud();
 }
 
 function rowProgress(row: HTMLElement) {
@@ -184,45 +184,6 @@ if (!reduceMotion) {
   document.fonts.addEventListener('loadingdone', measureScenes);
   measureScenes();
 }
-
-// --- cloud -------------------------------------------------------------------------------------
-
-const intro = $('#intro');
-const cloudCanvas = $<HTMLCanvasElement>('[data-cloud]');
-
-// the scroll ranges rowProgress reads, so shape k sits where the row shows step k
-function measureCloud() {
-  if (!cloud || !timeline) return;
-  const spans = sceneRows.map(row => {
-    const steps = stepsOf(row);
-    if (row.hasAttribute('data-pinned')) {
-      const { top, height } = row.getBoundingClientRect();
-      return { ...pinSpan(top, height, innerHeight, scrollY), steps };
-    }
-    const { top, height } = visualOf(row).getBoundingClientRect();
-    return { ...revealSpan(top + height / 2, innerHeight, scrollY), steps };
-  });
-  const settleAt = scrollY + timeline.getBoundingClientRect().top - READING_LINE * innerHeight;
-  const targets = [intro, ...sceneRows.flatMap(row => Array<HTMLElement>(stepsOf(row)).fill(visualOf(row))), timeline];
-  cloud.setTrack(trackAnchors(spans, settleAt), targets);
-}
-
-// under motion measureScenes re-measures the cloud with the rows
-if (reduceMotion) {
-  window.addEventListener('resize', measureCloud);
-  document.fonts.addEventListener('loadingdone', measureCloud);
-}
-
-// lazy, as the sphere was: three.js stays out of the first paint
-import('./cloud')
-  .then(({ startCloud }) => {
-    const rows = sceneRows.map(row => ({ slug: row.dataset.slug!, steps: stepsOf(row) }));
-    cloud = startCloud(cloudCanvas, { theme, mode: cloudMode(innerWidth, innerHeight, reduceMotion), rows });
-    measureCloud();
-    requestAnimationFrame(() => (cloudCanvas.dataset.visible = 'true'));
-  })
-  // a missing gpu is the visitor's environment, not a site bug, so it warns rather than errors
-  .catch(error => console.warn('cloud failed to start; the page shows without it', error));
 
 // --- scroll cue --------------------------------------------------------------------------------
 

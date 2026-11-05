@@ -4,6 +4,7 @@ import '@fontsource/montserrat/500.css';
 import '@fontsource/jetbrains-mono/400.css';
 import '../styles/global.css';
 import { name, nav, role, social } from '../data';
+import { ARRIVE_KEY } from '../lib/transition';
 
 const { title, description } = Astro.props as { title: string; description: string };
 ---
@@ -27,6 +28,14 @@ const { title, description } = Astro.props as { title: string; description: stri
       document.documentElement.classList.add('js');
       const theme = localStorage.getItem('theme');
       if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+    </script>
+    <script is:inline define:vars={{ ARRIVE_KEY }}>
+      // a page opened through the transition starts covered, and transition.ts uncovers it. the timeout uncovers it
+      // anyway should that script never run
+      if (sessionStorage.getItem(ARRIVE_KEY)) {
+        document.documentElement.classList.add('arriving');
+        setTimeout(() => document.documentElement.classList.remove('arriving'), 3000);
+      }
     </script>
   </head>
   <body>
@@ -90,6 +99,7 @@ const { title, description } = Astro.props as { title: string; description: stri
     <script>
       import '../scripts/theme';
       import '../scripts/nav';
+      import '../scripts/transition';
     </script>
   </body>
 </html>

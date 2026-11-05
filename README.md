@@ -14,6 +14,6 @@ npm run shots   # screenshots of the running dev server (desktop, phone, light, 
 
 ## Credit
 
-The layout, intro motion, theme toggle, decoder text and the cloud's hero displacement sphere are ported from
+The layout, intro motion, theme toggle, decoder text and displacement sphere are ported from
 [Hamish Williams' portfolio](https://github.com/HamishMW/portfolio) (hamishw.com), MIT licensed. His notice is in
-[LICENSE-hamishw](LICENSE-hamishw). The cloud's noise GLSL is Stefan Gustavson's (MIT), via the same repo.
+[LICENSE-hamishw](LICENSE-hamishw). The sphere's noise GLSL is Stefan Gustavson's (MIT), via the same repo.

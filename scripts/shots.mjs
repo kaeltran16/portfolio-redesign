@@ -2,7 +2,7 @@
 // headless chrome's window cannot go below ~500px wide, so phone sizes need device emulation.
 // usage: node scripts/shots.mjs [outDir]   (dev server on http://localhost:4321, or set BASE_URL;
 // SHOTS_SERVE=1 serves the last build (dist/) itself on a free port instead, so run `npm run build` first;
-// SHOTS=phone-390,role-wipe runs only those; SHOTS_SKIP=cloud-phone-fps leaves those out, and a name that matches
+// SHOTS=phone-390,role-wipe runs only those; SHOTS_SKIP=phone-fps leaves those out, and a name that matches
 // no scenario is an error). exits 1 on a failed step, and 3 when everything else passed but a gpu step was skipped
 // because chrome had no gpu
 import { spawn } from 'node:child_process';
@@ -16,6 +16,8 @@ import { READING_LINE, REVEAL_END, REVEAL_START } from '../src/lib/scene.ts';
 const OUT = process.argv[2] ?? process.env.ARC_FINAL_OUT ?? join(tmpdir(), 'portfolio-shots');
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PREVIEW_TIMEOUT_MS = 30_000;
+// the dev server compiles a page on its first request, which can take seconds on a busy machine
+const NAVIGATION_TIMEOUT_MS = 30_000;
 const CHROME = [
   process.env.CHROME,
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -228,16 +230,6 @@ const steady = n => `(async () => {
   await Promise.all(replayed.map(a => a.finished));
   return new Set(tops).size > 1 ? 'box moves between steps, tops ' + tops.join(', ') : '';
 })()`;
-// --- cloud: [data-cloud]'s data-shape names the track shape nearest the scroll position
-const cloudShape = "document.querySelector('[data-cloud]')?.dataset.shape";
-// the cloud is lazy, so a scenario that reads it first waits for its first frame
-const cloudStarted = `(async () => {
-  for (let i = 0; i < 180 && !${cloudShape}; i++) await ${frames};
-})()`;
-const cloudShows = shape => `(() => {
-  const shape = ${cloudShape};
-  return shape === '${shape}' ? '' : 'cloud shows ' + shape + ', not ${shape}';
-})()`;
 // returns an error string unless the point at the element's centre hits the element, so nothing is drawn over it
 const hitsText = selector => `(() => {
   const el = document.querySelector('${selector}');
@@ -247,24 +239,8 @@ const hitsText = selector => `(() => {
 })()`;
 // on phones the row's title is above its visual, off screen at a step, so the captions stand in for it: their list,
 // since the hidden captions share the shown one's place and are hit as well
-const cloudInRow = (n, slug, k, text = '.project-title') => allOf(cloudShows(`${slug}-${k}`), hitsText(`${row(n)} ${text}`));
+const textInRow = (n, text = '.project-title') => hitsText(`${row(n)} ${text}`);
 const CAPTIONS = '.scene-captions';
-// share of the screenshot the cloud must change for these scenes to count as showing it
-const CLOUD_SEEN = {
-  'scene-arc-1': 0.002,
-  'scene-arc-1-light': 0.002,
-  'scene-arc-2': 0.002,
-  'scene-siem-3': 0.001,
-  'scene-siem-4': 0.001,
-  'scene-siem-5': 0.001,
-  'scene-siem-6': 0.001,
-  'scene-siem-3-light': 0.002,
-  'scene-opal-1': 0.001,
-  'scene-opal-2': 0.001,
-  'scene-opal-3': 0.001,
-  'scene-opal-2-phone-390': 0.002,
-};
-
 // the consoles keep their own dark palette in both themes, like a screenshot, so only the captions are checked
 const sceneText = '.scene-captions li span';
 const sceneScenarios = [
@@ -280,9 +256,8 @@ const sceneScenarios = [
     viewport: desktop,
     waitMs: 1000,
     eval: light ? `${toggleTheme}; ${toStep(n, k)}` : toStep(n, k),
-    check: allOf(pinned(n), showsStep(n, k), readable(row(n), sceneText), cloudInRow(n, slug, k)),
-    cloudVisible: CLOUD_SEEN[name],
-    step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 4 : 6}, ${light ? 'light' : 'dark'}: row pinned, only panel ${k} lit and its command in the box, only caption ${k} shown, text at 4.5:1 or more, the cloud on ${slug}-${k} beneath the title${CLOUD_SEEN[name] ? ' and visible' : ''}`,
+    check: allOf(pinned(n), showsStep(n, k), readable(row(n), sceneText), textInRow(n)),
+    step: `${slug} scene scrolled to step ${k} of ${slug === 'arc' ? 4 : 6}, ${light ? 'light' : 'dark'}: row pinned, only panel ${k} lit and its command in the box, only caption ${k} shown, text at 4.5:1 or more, the title uncovered`,
   };
 });
 const opalScenarios = [[1, false], [2, false], [3, false], [4, false], [2, true]].map(([k, light]) => {
@@ -292,9 +267,8 @@ const opalScenarios = [[1, false], [2, false], [3, false], [4, false], [2, true]
     viewport: desktop,
     waitMs: 1000,
     eval: light ? `${toggleTheme}; ${toStep(OPAL, k)}` : toStep(OPAL, k),
-    check: allOf(pinned(OPAL), showsScreen(OPAL, k), readable(row(OPAL), `${sceneText}, .phone-names li`), cloudInRow(OPAL, 'opal', k)),
-    cloudVisible: CLOUD_SEEN[name],
-    step: `opal scene scrolled to step ${k} of 4, ${light ? 'light' : 'dark'}: row pinned, only screen ${k} in the phone, only its name marked and its caption shown, text at 4.5:1 or more, the cloud on opal-${k} beneath the title${CLOUD_SEEN[name] ? ' and visible' : ''}`,
+    check: allOf(pinned(OPAL), showsScreen(OPAL, k), readable(row(OPAL), `${sceneText}, .phone-names li`), textInRow(OPAL)),
+    step: `opal scene scrolled to step ${k} of 4, ${light ? 'light' : 'dark'}: row pinned, only screen ${k} in the phone, only its name marked and its caption shown, text at 4.5:1 or more, the title uncovered`,
   };
 });
 const steadyScenarios = [[ARC, 'arc'], [SIEM, 'siem'], [OPAL, 'opal']].map(([n, slug]) => ({
@@ -549,7 +523,8 @@ const skipLink = `(() => {
   if (r.top < 0 || r.bottom > innerHeight) return 'focused skip link is off screen at ' + Math.round(r.top) + 'px';
   return document.getElementById(new URL(skip.href).hash.slice(1))?.tagName === 'MAIN' ? '' : 'skip link does not target main';
 })()`;
-// on a case page the links go to Home: the click is left to the browser and no link is current
+// on a case page the links go to Home: nav.ts leaves the click to the browser and no link is current. run under
+// reduced motion, since otherwise the page transition takes the click (transition-case-to-home)
 const caseNavPlain = `(() => {
   let prevented;
   window.addEventListener('click', e => { prevented = e.defaultPrevented; e.preventDefault(); }, { once: true });
@@ -593,40 +568,76 @@ const watchEntrance = `(async () => {
   }
 })()`;
 
-// --- the cloud's canvas, track and cost
-// returns an error string unless there is one cloud canvas, fixed over the whole viewport and taking no pointer
-// events, and the sphere's own canvas is gone
-const cloudCanvas = `(() => {
-  const clouds = document.querySelectorAll('[data-cloud]');
-  if (clouds.length !== 1) return 'found ' + clouds.length + ' cloud canvases, not 1';
-  const style = getComputedStyle(clouds[0]);
-  const r = clouds[0].getBoundingClientRect();
+// --- the sphere and the page transition
+// returns an error string unless there is one sphere canvas, inside the intro, faded in, rendering and taking no
+// pointer events, and no page-wide cloud canvas
+const sphereCanvas = `(() => {
+  const spheres = document.querySelectorAll('#intro [data-sphere]');
+  if (spheres.length !== 1) return 'found ' + spheres.length + ' sphere canvases in the intro, not 1';
+  const [sphere] = spheres;
   const errors = [];
-  if (style.position !== 'fixed') errors.push('cloud is ' + style.position + ', not fixed');
-  if (style.pointerEvents !== 'none') errors.push('cloud takes pointer events');
-  if (r.left || r.top || r.width !== innerWidth || r.height !== innerHeight) {
-    errors.push('cloud is ' + r.width + 'x' + r.height + ' at ' + r.left + ',' + r.top + ', not the ' + innerWidth + 'x' + innerHeight + ' viewport');
-  }
-  if (document.querySelector('[data-sphere]')) errors.push('the old sphere canvas is still there');
+  if (getComputedStyle(sphere).pointerEvents !== 'none') errors.push('sphere takes pointer events');
+  if (sphere.dataset.visible !== 'true') errors.push('sphere has not faded in');
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches && sphere.dataset.running !== 'true') errors.push('sphere is not rendering');
+  if (document.querySelector('[data-cloud]')) errors.push('the old cloud canvas is still there');
   return errors.join('; ');
 })()`;
-// scrolls from the top to past Experience a twelfth of the viewport at a time; returns an error string unless the
-// shapes the cloud names, repeats dropped, are the whole track in order
-const cloudSweep = `(async () => {
-  await document.fonts.ready;
-  await ${cloudStarted};
-  const rows = [...document.querySelectorAll('#projects .project')].filter(r => r.querySelector('.scene'));
-  const steps = r => Array.from({ length: Number(r.querySelector('.scene').dataset.steps) }, (_, k) => r.dataset.slug + '-' + (k + 1));
-  const want = ['sphere', ...rows.flatMap(steps), 'settle'];
-  const seen = [];
-  const end = scrollY + document.getElementById('experience').getBoundingClientRect().bottom;
-  for (let y = 0; y <= end; y += innerHeight / 12) {
-    window.scrollTo({ top: y, behavior: 'instant' });
-    await ${frames};
-    const shape = ${cloudShape};
-    if (seen.at(-1) !== shape) seen.push(shape);
+// the sphere is lazy, so a scenario that measures it first waits for it to start
+const sphereStarted = `(async () => {
+  for (let i = 0; i < 180 && !document.querySelector('[data-sphere][data-visible]'); i++) await ${frames};
+})()`;
+// clicks the link and keeps whether the cover started and where the link goes in sessionStorage, which the page it
+// opens can still read
+const leaveThrough = selector => `(async () => {
+  // transition.ts must be running, or the click is a plain navigation
+  if (document.readyState !== 'complete') await new Promise(r => addEventListener('load', r, { once: true }));
+  const link = document.querySelector('${selector}');
+  link.click();
+  const cover = document.querySelector('[data-page-transition]');
+  const { pathname, hash } = new URL(link.href);
+  sessionStorage.setItem('shots-leaving', JSON.stringify({ pathname, hash, covering: !!cover && !cover.hidden }));
+})()`;
+const leaveForArc = leaveThrough(`${row(ARC)} a[href*="/projects/"]`);
+// injected before load: how a page opened through the transition looked before its scripts ran and right after
+const watchArrival = `(() => {
+  if (!sessionStorage.getItem('transition-arrive')) return;
+  const seen = {};
+  document.addEventListener('readystatechange', () => {
+    if (document.readyState === 'interactive') seen.cssCover = document.documentElement.classList.contains('arriving');
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    const cover = document.querySelector('[data-page-transition]');
+    seen.drawnCover = !!cover && !cover.hidden;
+    sessionStorage.setItem('shots-arrival', JSON.stringify(seen));
+  });
+})()`;
+// returns an error string unless the click led to the link's page, and section if it has one, covered or not as
+// `animated` says, and the page ends uncovered with nothing left over for the next navigation
+const arrived = animated => `(() => {
+  const left = JSON.parse(sessionStorage.getItem('shots-leaving') ?? '{}');
+  const arrival = JSON.parse(sessionStorage.getItem('shots-arrival') ?? '{}');
+  const cover = document.querySelector('[data-page-transition]');
+  const trim = path => (path?.endsWith('/') ? path.slice(0, -1) : path);
+  const errors = [];
+  if (trim(location.pathname) !== trim(left.pathname)) errors.push('ended on ' + location.pathname + ', not ' + left.pathname);
+  if (left.hash) {
+    const section = document.getElementById(left.hash.slice(1))?.getBoundingClientRect();
+    if (location.hash !== left.hash) errors.push('ended at ' + (location.hash || 'no hash') + ', not ' + left.hash);
+    else if (!section || Math.abs(section.top) > innerHeight / 2) errors.push(left.hash + ' is not in view, its top at ' + section?.top);
   }
-  return seen.join() === want.join() ? '' : 'cloud passed [' + seen.join(', ') + '], not [' + want.join(', ') + ']';
+  if (document.documentElement.classList.contains('arriving')) errors.push('the page is still covered by css');
+  if (sessionStorage.getItem('transition-arrive')) errors.push('the arrive flag was left set');
+  if (${animated}) {
+    if (!left.covering) errors.push('the click did not start covering');
+    if (!arrival.cssCover) errors.push('the page it opened was not covered from first paint');
+    if (!arrival.drawnCover) errors.push('the page it opened did not start under the drawn cover');
+    if (!cover) errors.push('no transition canvas on the page it opened');
+    else if (!cover.hidden) errors.push('the page it opened is still covered');
+  } else {
+    if (left.covering) errors.push('the click covered the page under reduced motion');
+    if (cover) errors.push('a transition canvas under reduced motion');
+  }
+  return errors.join('; ');
 })()`;
 // injected before load: canvases give no webgl context, and warnings are kept for the check
 const noWebgl = `(() => {
@@ -649,7 +660,7 @@ const webglRenderer = `(() => {
 // summed rgb difference over which a pixel counts as changed, above png and antialiasing noise
 const PIXEL_CHANGED = 24;
 // returns an error string unless at least `share` of the pixels differ between two base64 pngs, decoded in the page
-const cloudChanges = (shown, bare, share) => `(async () => {
+const sphereChanges = (shown, bare, share) => `(async () => {
   const pixels = async src => {
     const img = new Image();
     img.src = src;
@@ -664,7 +675,7 @@ const cloudChanges = (shown, bare, share) => `(async () => {
     if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > ${PIXEL_CHANGED}) changed++;
   }
   const got = changed / (a.length / 4);
-  return got >= ${share} ? '' : 'the cloud changes ' + (got * 100).toFixed(2) + '% of the pixels, under ${share * 100}%';
+  return got >= ${share} ? '' : 'the sphere changes ' + (got * 100).toFixed(2) + '% of the pixels, under ${share * 100}%';
 })()`;
 
 const SCENARIOS = [
@@ -719,7 +730,7 @@ const SCENARIOS = [
     check: `getComputedStyle(document.querySelector('#about .section-title'), '::after').animationName === 'none' ? '' : 'arrival cue animates under reduced motion'`,
     step: 'opened at /#about under reduced motion: no arrival cue',
   },
-  { name: 'nav-case-page', viewport: desktop, page: 'projects/arc', waitMs: 500, check: caseNavPlain, step: 'case page: rail links are plain links to Home, none current' },
+  { name: 'nav-case-page', viewport: desktop, page: 'projects/arc', reduced: true, waitMs: 500, check: caseNavPlain, step: 'case page under reduced motion: rail links are plain links to Home, none current' },
   { name: 'skip-link', viewport: desktop, waitMs: 500, check: skipLink, step: 'skip link is the first stop, hidden until focused, on screen when focused, targets main' },
   { name: 'menu-desktop', viewport: desktop, waitMs: 500, check: menuShown(false), step: 'at 1440x900: rail links shown, no menu button' },
   { name: 'menu-short-window', viewport: { ...desktop, height: 650 }, waitMs: 500, check: menuShown(true), step: 'at 1440x650: rail links hidden, menu button shown' },
@@ -753,17 +764,16 @@ const SCENARIOS = [
       `document.querySelector('${row(OPAL)}').hasAttribute('data-pinned') ? 'opal row is pinned' : ''`,
       showsScreen(OPAL, 2),
       readable(row(OPAL), `${sceneText}, .phone-names li`),
-      cloudInRow(OPAL, 'opal', 2, CAPTIONS),
+      textInRow(OPAL, CAPTIONS),
     ),
-    cloudVisible: CLOUD_SEEN['scene-opal-2-phone-390'],
-    step: 'opal scene scrolled to step 2 on a 390px phone: not pinned, only the Areas screen in the phone, its name marked and its caption shown, within the width, the cloud on opal-2 beneath the caption and visible',
+    step: 'opal scene scrolled to step 2 on a 390px phone: not pinned, only the Areas screen in the phone, its name marked and its caption shown, within the width, the caption uncovered',
   },
   {
     name: 'scene-siem-2-phone-390',
     viewport: phone,
     waitMs: 1000,
     eval: toRevealStep(SIEM, 2),
-    check: allOf(cloudInRow(SIEM, 'siem', 2, CAPTIONS), `(() => {
+    check: allOf(textInRow(SIEM, CAPTIONS), `(() => {
       ${sceneKit}
       const row = document.querySelector('${row(SIEM)}');
       if (row.dataset.step !== '2') return 'row is at step ' + row.dataset.step + ', not 2';
@@ -779,8 +789,7 @@ const SCENARIOS = [
       if (caption && box.bottom > caption.top + 0.5) return 'box overlaps the step caption';
       return box.top < text.bottom - 0.5 && box.bottom > text.top + 0.5 ? 'box overlaps the row text' : '';
     })()`),
-    cloudVisible: 0.001,
-    step: 'siem scene scrolled to step 2 on a 390px phone: not pinned, only the risk panel shows, the console inside its box and the width, above the caption and the row text, the cloud on siem-2 beneath the caption and visible',
+    step: 'siem scene scrolled to step 2 on a 390px phone: not pinned, only the risk panel shows, the console inside its box and the width, above the caption and the row text, the caption uncovered',
   },
   {
     name: 'scenes-phone-390',
@@ -897,11 +906,9 @@ const SCENARIOS = [
       if (heading.top < 0 || heading.bottom > innerHeight) errors.push('experience heading is not in the viewport');
       const behind = roles.filter(role => role.getBoundingClientRect().top < reading && !role.hasAttribute('data-reached'));
       if (behind.length) errors.push(behind.length + ' roles above the reading line are not reached');
-      const shape = ${cloudShape};
-      if (shape !== 'settle') errors.push('cloud shows ' + shape + ', not settle');
       return errors.join('; ');
     })()`,
-    step: 'opened at /#experience: the arc and siem rows above show their last step, the heading is in view, the timeline drawn to the reading line, the cloud already settled',
+    step: 'opened at /#experience: the arc and siem rows above show their last step, the heading is in view, the timeline drawn to the reading line',
   },
   {
     name: 'scenes-reduced-motion',
@@ -1008,7 +1015,7 @@ const SCENARIOS = [
     name: 'og',
     viewport: { width: 1200, height: 630, deviceScaleFactor: 1, mobile: false },
     waitMs: 7000,
-    check: allOf(titleFits, cloudShows('sphere'), introPitchShown),
+    check: allOf(titleFits, sphereCanvas, introPitchShown),
     step: 'Home first screen at 1200x630 for the share image: title fits, sphere drawn, proof line shown',
   },
   {
@@ -1166,125 +1173,105 @@ const SCENARIOS = [
     step: 'experience under reduced motion: no smooth scroll, no split headings, no entrance styles',
   },
   ...[
-    ['cloud-hero', desktop, false],
-    ['cloud-hero-phone-390', phone, false],
-    ['cloud-hero-light', desktop, true],
+    ['sphere-hero', desktop, false],
+    ['sphere-hero-phone-390', phone, false],
+    ['sphere-hero-light', desktop, true],
   ].map(([name, viewport, light]) => ({
     name,
     viewport,
     // the canvas fades in over 3s
     waitMs: 3500,
     eval: light ? toggleTheme : undefined,
-    check: allOf(cloudCanvas, cloudShows('sphere'), hitsText('[data-intro-name]')),
-    cloudVisible: 0.02,
-    step: `top of the page at ${viewport.width}px, ${light ? 'light' : 'dark'}: one fixed, viewport-sized cloud canvas that takes no pointer events, showing the sphere and visible, no old sphere canvas, the intro name uncovered`,
+    check: allOf(sphereCanvas, hitsText('[data-intro-name]')),
+    sphereVisible: 0.02,
+    step: `top of the page at ${viewport.width}px, ${light ? 'light' : 'dark'}: one sphere canvas in the intro, rendering, visible and taking no pointer events, no cloud canvas, the intro name uncovered`,
   })),
   {
-    name: 'cloud-dissolve',
+    name: 'sphere-offscreen',
     viewport: desktop,
-    waitMs: 2500,
-    eval: toStep(ARC, 1, 0.4),
-    check: cloudShows('sphere'),
-    cloudVisible: 0.005,
-    step: 'scrolled 40% of the way to the first arc step at 1440px: the cloud still names the sphere, which breaks into dots',
-  },
-  ...[
-    ['cloud-sweep', desktop],
-    ['cloud-sweep-phone-390', phone],
-  ].map(([name, viewport]) => ({
-    name,
-    viewport,
-    waitMs: 500,
-    check: cloudSweep,
-    step: `scrolling from the top to past Experience at ${viewport.width}px, a twelfth of the viewport at a time: the cloud passes every track shape in order and never goes back`,
-  })),
-  { name: 'cloud-settle', viewport: desktop, waitMs: 1000, eval: showExperience, check: cloudShows('settle'), step: 'experience scrolled into view: the cloud settles' },
-  {
-    name: 'cloud-resize',
-    viewport: desktop,
-    eval: `${toStep(ARC, 2)}.then(() => (window.wasPinned = document.querySelector('${row(ARC)}').hasAttribute('data-pinned')))`,
-    resize: shortWindow,
     waitMs: 1000,
-    // the shorter page leaves the scroll position past the arc row, so the check scrolls back to its step 2, which
-    // the cloud's old pinned anchors would place elsewhere
-    check: `(async () => {
-      const row = document.querySelector('${row(ARC)}');
-      if (!window.wasPinned) return 'arc row was not pinned before the resize';
-      if (row.hasAttribute('data-pinned')) return 'arc row is still pinned at ' + innerWidth + 'x' + innerHeight;
-      await ${toRevealStep(ARC, 2)};
-      const shape = ${cloudShape};
-      if (row.dataset.step !== '2') return 'arc row is at step ' + row.dataset.step + ', not 2';
-      return shape === 'arc-' + row.dataset.step ? '' : 'cloud shows ' + shape + ' with the arc row at step ' + row.dataset.step;
-    })()`,
-    step: 'arc row pinned at step 2, then the window made 1280x480 so it unpins, then scrolled back to its step 2: the cloud re-anchored and shows arc-2',
+    eval: `(async () => { await ${sphereStarted}; ${showExperience}; })()`,
+    check: `document.querySelector('[data-sphere]').dataset.running === 'false' ? '' : 'the sphere still renders with the intro off screen'`,
+    step: 'experience scrolled into view: the sphere stops rendering while the intro is off screen',
   },
   {
-    name: 'cloud-reduced-motion',
+    name: 'sphere-reduced-motion',
     viewport: desktop,
     waitMs: 1000,
     reduced: true,
     eval: `(async () => {
-      await ${cloudStarted};
+      await ${sphereStarted};
       window.framesAsked = 0;
       const ask = window.requestAnimationFrame.bind(window);
       window.requestAnimationFrame = callback => (window.framesAsked++, ask(callback));
-      document.querySelector('${row(SIEM)} .project-visual').scrollIntoView({ block: 'center', behavior: 'instant' });
     })()`,
-    check: `(() => {
-      const shape = ${cloudShape};
-      if (window.framesAsked) return window.framesAsked + ' animation frames requested under reduced motion';
-      return shape?.startsWith('siem-') ? '' : 'cloud shows ' + shape + ' with the siem row in view';
-    })()`,
-    step: 'siem row scrolled into view under reduced motion: the cloud redraws on scroll with a siem shape, and nothing requests an animation frame for a second',
+    check: allOf(sphereCanvas, `window.framesAsked ? window.framesAsked + ' animation frames requested under reduced motion' : ''`),
+    sphereVisible: 0.02,
+    step: 'top of the page under reduced motion: the sphere drawn once and visible, and nothing requests an animation frame for a second',
   },
   {
-    name: 'cloud-opal-reduced-motion',
-    viewport: desktop,
-    waitMs: 1000,
-    reduced: true,
-    eval: `(async () => {
-      await ${cloudStarted};
-      document.querySelector('${row(OPAL)} .project-visual').scrollIntoView({ block: 'center', behavior: 'instant' });
-    })()`,
-    // cloudShows matches whole names only, and a still page may rest on any opal step
-    check: `(() => { const shape = ${cloudShape}; return shape?.startsWith('opal-') ? '' : 'cloud shows ' + shape + ' with the opal row in view'; })()`,
-    clip: row(OPAL),
-    step: 'opal row under reduced motion: the cloud draws a still opal frame with no patch beside the phone',
-  },
-  {
-    name: 'cloud-no-webgl',
+    name: 'sphere-no-webgl',
     viewport: desktop,
     waitMs: 1000,
     init: noWebgl,
     eval: toStep(ARC, 2),
     check: allOf(
-      `document.querySelector('[data-shape]') ? 'the cloud drew with no webgl' : ''`,
-      `window.warnings.some(w => w.startsWith('cloud failed to start')) ? '' : 'no warning that the cloud failed to start'`,
+      `document.querySelector('[data-sphere][data-visible]') ? 'the sphere drew with no webgl' : ''`,
+      `window.warnings.some(w => w.startsWith('sphere failed to start')) ? '' : 'no warning that the sphere failed to start'`,
+      `window.warnings.some(w => w.startsWith('page transition failed to start')) ? '' : 'no warning that the page transition failed to start'`,
       showsStep(ARC, 2),
       `document.querySelector('.split-char') ? '' : 'headings are not split'`,
     ),
-    step: 'no webgl: no cloud and a warning, no error; the arc row still steps when scrolled and the headings still split',
+    step: 'no webgl: no sphere and no page transition, a warning for each and no error; the arc row still steps when scrolled and the headings still split',
   },
   {
-    name: 'cloud-phone-fps',
+    name: 'phone-fps',
     viewport: phone,
     gpu: true,
     throttle: 4,
     waitMs: 0,
     eval: `(async () => {
-      await ${cloudStarted};
-      const { top, bottom } = document.getElementById('projects').getBoundingClientRect();
-      const from = scrollY + top;
+      await ${sphereStarted};
+      const end = scrollY + document.getElementById('projects').getBoundingClientRect().bottom;
       const begin = performance.now();
       let count = 0;
       for (let now = begin; now - begin < ${FPS_SWEEP_MS}; now = await new Promise(r => requestAnimationFrame(r))) {
-        window.scrollTo({ top: from + (bottom - top) * (now - begin) / ${FPS_SWEEP_MS}, behavior: 'instant' });
+        window.scrollTo({ top: end * (now - begin) / ${FPS_SWEEP_MS}, behavior: 'instant' });
         count++;
       }
       window.fps = count / ((performance.now() - begin) / 1000);
     })()`,
-    check: `window.fps >= ${MIN_FPS} ? '' : 'scrolling the projects ran at ' + window.fps.toFixed(1) + ' fps, under ${MIN_FPS}'`,
-    step: `projects scrolled one step per frame over ${FPS_SWEEP_MS / 1000}s on a 390px phone, cpu slowed 4x, on a gpu: ${MIN_FPS} fps or more`,
+    check: `window.fps >= ${MIN_FPS} ? '' : 'scrolling from the sphere through the projects ran at ' + window.fps.toFixed(1) + ' fps, under ${MIN_FPS}'`,
+    step: `from the top through the projects, one step per frame over ${FPS_SWEEP_MS / 1000}s on a 390px phone, cpu slowed 4x, on a gpu: ${MIN_FPS} fps or more`,
+  },
+  ...[
+    ['transition', desktop, false],
+    ['transition-phone-390', phone, false],
+    ['transition-reduced-motion', desktop, true],
+  ].map(([name, viewport, reduced]) => ({
+    name,
+    viewport,
+    reduced,
+    init: watchArrival,
+    eval: leaveForArc,
+    navigates: /^\/projects\//,
+    // the arriving dissolve runs 600ms after load
+    waitMs: 1500,
+    check: arrived(!reduced),
+    step: reduced
+      ? 'arc View project clicked under reduced motion: the arc page opens at once, with no cover on either page'
+      : `arc View project clicked at ${viewport.width}px: home starts covering, the arc page opens covered from first paint, then under the drawn cover, and ends uncovered with no flag left set`,
+  })),
+  {
+    name: 'transition-case-to-home',
+    viewport: desktop,
+    page: 'projects/arc',
+    init: watchArrival,
+    eval: leaveThrough('.rail-link'),
+    navigates: /^\/$/,
+    waitMs: 1500,
+    check: arrived(true),
+    step: 'arc case page, first rail link clicked: the page dissolves, Home opens covered at that section and ends uncovered there',
   },
 ];
 // the viewport point at the centre of a selector, or of the viewport with none
@@ -1408,6 +1395,25 @@ async function run({ send, listeners }, s) {
     if (exceptionDetails) errors.push(`${s.name}: ${what} threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
     else if (result.value) errors.push(`${s.name}: ${result.value}`);
   };
+  // resolves once the tab has navigated to a path matching `path` and loaded it, to an error string if not in time.
+  // a check sent while the tab is still navigating never gets an answer, so a scenario whose eval opens another page
+  // (`navigates`, a pattern for its path) waits for it. the path matters: the first page may still be loading
+  const loadOf = path =>
+    new Promise(resolve => {
+      let landed = false;
+      const done = result => {
+        clearTimeout(timer);
+        listeners.splice(listeners.indexOf(onNavigation), 1);
+        resolve(result);
+      };
+      const onNavigation = msg => {
+        if (msg.sessionId !== sessionId) return;
+        if (msg.method === 'Page.frameNavigated' && !msg.params.frame.parentId) landed = path.test(new URL(msg.params.frame.url).pathname);
+        if (msg.method === 'Page.loadEventFired' && landed) done('');
+      };
+      const timer = setTimeout(() => done(`${s.name}: did not load a page at ${path} within ${NAVIGATION_TIMEOUT_MS / 1000}s`), NAVIGATION_TIMEOUT_MS);
+      listeners.push(onNavigation);
+    });
   const step = s.step ?? `open at ${s.viewport.width}px${s.reduced ? ', reduced motion' : ''}${s.eval ? ', theme toggled' : ''}${s.clip ? `, ${s.clip} captured` : ''}`;
   try {
     await send('Runtime.enable', {}, sessionId);
@@ -1431,8 +1437,11 @@ async function run({ send, listeners }, s) {
     // after load, so it slows what the scenario measures rather than the page's start
     if (s.throttle) await send('Emulation.setCPUThrottlingRate', { rate: s.throttle }, sessionId);
     if (s.eval) {
+      const load = s.navigates && loadOf(s.navigates);
       const { exceptionDetails } = await send('Runtime.evaluate', { expression: s.eval, awaitPromise: true }, sessionId);
       if (exceptionDetails) errors.push(`${s.name}: eval threw ${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
+      const late = load && (await load);
+      if (late) errors.push(late);
     }
     // a real wheel through the input pipeline: a synthetic WheelEvent never scrolls anything natively.
     // `after` runs at once, to act while the scroll it starts is still under way
@@ -1458,11 +1467,11 @@ async function run({ send, listeners }, s) {
     const file = `${s.name}.png`;
     writeFileSync(join(OUT, file), Buffer.from(data, 'base64'));
     console.log(`wrote ${join(OUT, file)}`);
-    // the same view without the cloud: only pixels can prove it is drawn where it can be seen
-    if (s.cloudVisible) {
-      await evaluate(`document.querySelector('[data-cloud]').style.visibility = 'hidden'; ${frames}`);
+    // the same view without the sphere: only pixels can prove it is drawn where it can be seen
+    if (s.sphereVisible) {
+      await evaluate(`document.querySelector('[data-sphere]').style.visibility = 'hidden'; ${frames}`);
       const { data: bare } = await send('Page.captureScreenshot', screenshot, sessionId);
-      await expectNoError('cloud comparison', cloudChanges(data, bare, s.cloudVisible));
+      await expectNoError('sphere comparison', sphereChanges(data, bare, s.sphereVisible));
     }
     const failed = errors.filter(e => e.startsWith(`${s.name}: `));
     return { name: s.name, files: [file], steps: [{ step, state: failed.length ? 'fail' : 'pass', detail: failed.join('; ') || undefined }] };

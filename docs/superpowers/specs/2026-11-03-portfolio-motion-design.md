@@ -1,5 +1,7 @@
 # Portfolio motion: particle cloud plus text and scroll polish
 
+> Superseded in part on 2026-11-05: the page-wide cloud (goal 1) was removed for a hero-only sphere and a page transition; see `2026-11-05-hero-sphere-transition-design.md`. The text and scroll polish stands.
+
 Date: 2026-11-03. Brainstorm state: `.superpowers/brainstorm/portfolio-motion/brainstorm.json`. Samples: `.superpowers/design/portfolio-motion/spike/motion.html` (round 1, A-J) and `motion-2.html` (round 2, K-P). Both are gitignored throwaways; read them for feel, not for code to copy.
 
 ## Intent and why

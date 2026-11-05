@@ -14,15 +14,6 @@
   container: scene / inline-size;
 }
 
-/* stacked rows put the title above the visual, where the cloud draws its band. the band reaches (CLOUD_SPREAD - 1)
-   / 2 = 0.3 of the visual's height above it (cloud.ts, shapes.ts), so that much room keeps its dots off the text.
-   a percentage padding reads the row's width, and the visual is that width up to 680px at 680:520 */
-@media (max-width: 1040px) {
-  .scene {
-    padding-top: calc(min(100%, 680px) * 0.3 * 520 / 680);
-  }
-}
-
 /* --- pin -------------------------------------------------------------------------------------- */
 
 /* page.ts pins a row only when the window can hold its content. the row itself is the scroll track, so
